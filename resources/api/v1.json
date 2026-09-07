@@ -1,0 +1,12 @@
+{
+  "schema": "kumwe-zend-api/v1",
+  "state": "candidate",
+  "owner": "kumwe/kumwe-engine",
+  "module": "kumwe_engine",
+  "platform": "ext-kumwe_engine",
+  "runtime": "zend",
+  "classes": {
+    "Kumwe\\Engine\\Runtime": {"final": true, "cloneable": false, "serializable": false, "methods": ["capabilities(): array", "compile(array $envelope): array", "execute(array $envelope): array"]},
+    "Kumwe\\Engine\\Exception\\BindingFailure": {"final": true, "extends": "RuntimeException", "methods": []}
+  }
+}

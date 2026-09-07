@@ -1,0 +1,18 @@
+{
+  "schema": "kumwe-zend-compatibility/v1",
+  "state": "candidate",
+  "release_verified": false,
+  "version": "0.0.0-dev",
+  "engine_lock": "resources/engine-lock.json",
+  "php": "8.5",
+  "thread_model": "NTS",
+  "os": "Linux",
+  "architecture": "x86_64",
+  "distribution": "self-contained-source",
+  "abi_major": 1,
+  "statuses": {"0": "result", "1": "BindingFailure:1", "2": "BindingFailure:2", "3": "BindingFailure:3", "4": "BindingFailure:4", "5": "BindingFailure:5", "6": "BindingFailure:6", "7": "BindingFailure:7", "8": "BindingFailure:8"},
+  "finding_policy": "native portable findings preserved without translation",
+  "fallback": false,
+  "persistent_cache": false,
+  "publication_allowed": false
+}

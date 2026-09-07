@@ -186,11 +186,11 @@ static zend_result encode_envelope(zval *input, smart_str *buffer)
     return SUCCESS;
 }
 
-static zend_result decode_buffer(kumwe_engine_v1_buffer *buffer, zval *result)
+static zend_result decode_buffer(kumwe_engine_v1_buffer *buffer, zval *result, size_t maximum_bytes)
 {
     kumwe_engine_v1_view view = {sizeof(kumwe_engine_v1_view), 1, NULL, 0};
     if (kumwe_engine_v1_buffer_view(buffer, &view) != KUMWE_ENGINE_V1_OK || view.data == NULL
-        || view.size > BINDING_MAX_BYTES) {
+        || view.size > maximum_bytes) {
         binding_failure(KUMWE_ENGINE_V1_INTERNAL_FAILURE);
         return FAILURE;
     }
@@ -211,9 +211,11 @@ PHP_METHOD(Kumwe_Engine_Runtime, capabilities)
     kumwe_engine_v1_view input = {sizeof(kumwe_engine_v1_view), 1, handshake, sizeof(handshake)};
     kumwe_engine_v1_buffer *buffer = NULL;
     const kumwe_engine_v1_status status = kumwe_engine_v1_capabilities(&input, &buffer);
-    if (status != KUMWE_ENGINE_V1_OK) { binding_failure(status); RETURN_THROWS(); }
+    if (status != KUMWE_ENGINE_V1_OK) {
+        kumwe_engine_v1_buffer_release(&buffer); binding_failure(status); RETURN_THROWS();
+    }
     zend_try {
-        if (decode_buffer(buffer, return_value) == SUCCESS) {
+        if (decode_buffer(buffer, return_value, BINDING_MAX_BYTES) == SUCCESS) {
             add_assoc_string(return_value, "extension_version", PHP_KUMWE_ENGINE_VERSION);
             add_assoc_string(return_value, "embedded_engine_commit", KUMWE_EMBEDDED_ENGINE_COMMIT);
             add_assoc_string(return_value, "embedded_source_sha256", KUMWE_EMBEDDED_ENGINE_SHA256);
@@ -272,7 +274,7 @@ PHP_METHOD(Kumwe_Engine_Runtime, compile)
     zend_try {
         zval decoded;
         ZVAL_UNDEF(&decoded);
-        if (decode_buffer(descriptor, &decoded) == SUCCESS) {
+        if (decode_buffer(descriptor, &decoded, BINDING_MAX_BYTES) == SUCCESS) {
             array_init(return_value);
             add_assoc_stringl(return_value, "plan_id", identity, 32);
             add_assoc_zval(return_value, "descriptor", &decoded);
@@ -411,7 +413,7 @@ static void execute_canonical(zval *envelope, zval *return_value)
         kumwe_engine_v1_buffer_release(&buffer); binding_failure(status); return;
     }
     zend_try {
-        decode_buffer(buffer, return_value);
+        decode_buffer(buffer, return_value, (size_t)67108864);
     } zend_catch {
         kumwe_engine_v1_buffer_release(&buffer); zend_bailout();
     } zend_end_try();
@@ -462,7 +464,7 @@ PHP_METHOD(Kumwe_Engine_Runtime, execute)
         kumwe_engine_v1_buffer_release(&buffer); binding_failure(status); RETURN_THROWS();
     }
     zend_try {
-        decode_buffer(buffer, return_value);
+        decode_buffer(buffer, return_value, BINDING_MAX_BYTES);
     } zend_catch {
         kumwe_engine_v1_buffer_release(&buffer); zend_bailout();
     } zend_end_try();
