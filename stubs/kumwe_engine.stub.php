@@ -7,6 +7,7 @@ namespace Kumwe\Engine {
     {
         public function capabilities(): array {}
         public function compile(array $envelope): array {}
+        /** Compiled calls accept result_format "both" (default) or "opaque" (omit decoded result). */
         public function execute(array $envelope): array {}
 
         /** Release a plan owned by this Runtime and reclaim its capacity. */

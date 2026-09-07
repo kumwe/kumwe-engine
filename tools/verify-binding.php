@@ -10,6 +10,8 @@ if ($composer['name'] !== 'kumwe/kumwe-engine' || $composer['type'] !== 'php-ext
 }
 $api = json_decode(file_get_contents($root . '/resources/api/v1.json'), true, 512, JSON_THROW_ON_ERROR);
 if ($api['owner'] !== $composer['name'] || $api['module'] !== 'kumwe_engine' || $api['platform'] !== 'ext-kumwe_engine'
+    || $api['binding_features'] !== ['opaque-compiled-results/1']
+    || $api['execute_profiles']['compiled-plan']['result_format']['allowed'] !== ['both', 'opaque']
     || $api['runtime'] !== 'zend' || array_keys($api['classes']) !== ['Kumwe\\Engine\\Runtime', 'Kumwe\\Engine\\Exception\\BindingFailure']
     || $api['classes']['Kumwe\\Engine\\Runtime']['methods'] !== ['capabilities(): array', 'compile(array $envelope): array', 'execute(array $envelope): array', 'release(string $planId): void']) {
     throw new RuntimeException('The public manifest differs from the reviewed native owner/API.');
@@ -17,6 +19,10 @@ if ($api['owner'] !== $composer['name'] || $api['module'] !== 'kumwe_engine' || 
 $stub = file_get_contents($root . '/stubs/kumwe_engine.stub.php');
 $arginfo = file_get_contents($root . '/src/kumwe_engine_arginfo.h');
 $source = file_get_contents($root . '/src/kumwe_engine.c');
+if (!str_contains($source, '"opaque-compiled-results/1"')
+    || !str_contains($source, '"result_format"')) {
+    throw new RuntimeException('Binding feature and compiled result-format source drift.');
+}
 foreach (['capabilities' => '', 'compile' => 'array $envelope', 'execute' => 'array $envelope', 'release' => 'string $planId'] as $method => $parameters) {
     $return = $method === 'release' ? 'void' : 'array';
     if (!str_contains($stub, "public function $method($parameters): $return")

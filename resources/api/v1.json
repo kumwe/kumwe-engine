@@ -5,6 +5,7 @@
   "module": "kumwe_engine",
   "platform": "ext-kumwe_engine",
   "runtime": "zend",
+  "binding_features": ["opaque-compiled-results/1"],
   "classes": {
     "Kumwe\\Engine\\Runtime": {
       "final": true,
@@ -45,7 +46,15 @@
       "input": "original PHP values transported as native typed tags"
     },
     "compiled-plan": {
-      "input": "Runtime-owned plan_id and bounded batch envelope"
+      "input": "Runtime-owned plan_id and bounded batch envelope",
+      "optional_request_fields": ["cancelled", "result_format"],
+      "result_format": {
+        "default": "both",
+        "allowed": ["both", "opaque"],
+        "both": ["correlation", "findings", "result", "result_json"],
+        "opaque": ["correlation", "findings", "result_json"],
+        "limits": "Both modes retain the original complete logical JSON input/output byte charges."
+      }
     }
   },
   "build_handshake": {

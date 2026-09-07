@@ -1,4 +1,27 @@
 <?php
+// Replay each compiled owner fixture through both public result representations.
+// Values, portable findings, opaque bytes and refusal codes must stay identical.
+function execute_formats(Kumwe\Engine\Runtime $runtime, array $request): array
+{
+    try {
+        $both = $runtime->execute($request);
+    } catch (Kumwe\Engine\Exception\BindingFailure $expected) {
+        try { $runtime->execute($request + ['result_format' => 'opaque']); }
+        catch (Kumwe\Engine\Exception\BindingFailure $actual) {
+            if ($actual->getCode() === $expected->getCode()) { throw $expected; }
+            throw new RuntimeException('Opaque result format changed refusal code.');
+        }
+        throw new RuntimeException('Opaque result format bypassed refusal.');
+    }
+    $expected = $both;
+    foreach ($expected['results'] as &$row) { unset($row['result']); }
+    unset($row);
+    if ($runtime->execute($request + ['result_format' => 'opaque']) !== $expected) {
+        throw new RuntimeException('Opaque result format changed bytes, findings, correlation or row order.');
+    }
+    return $both;
+}
+
 function formula_envelope(array $program): array
 {
     return [

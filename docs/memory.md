@@ -21,3 +21,10 @@ retains the same conservative admission and public result arrays; the Engine cha
 logical JSON input/output budgets. PHP JSON decoding receives an owned NUL-terminated slice
 because its scanner requires termination beyond the explicit byte length. The temporary slice
 and native response are released on normal return, parser refusal and Zend bailout.
+
+With compiled `result_format: "opaque"`, framed payloads stay in their original Engine-owned
+JSON representation until copied into the returned `result_json` string. Portable findings are
+still decoded; the unused `result` PHP tree is omitted. The default retains both representations.
+All nodes are attached to the owned return value before subsequent child allocation, and the same
+native-buffer bailout guard applies. Original logical input/output limits remain charged by Engine
+in either mode; a smaller PHP representation cannot admit a previously oversized response.

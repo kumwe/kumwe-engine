@@ -17,7 +17,7 @@ $plan = $runtime->compile(['wire_version' => 1, 'profile' => 'normalized-prepara
     'corpus_digest' => hash_file('sha256', $path), 'program' => json_encode($fixture->program, JSON_THROW_ON_ERROR)]);
 $execute = static function (stdClass $fields) use ($runtime, $plan, $fixture): array {
     $input = json_encode(['fields' => $fields, 'lines' => $fixture->lines], JSON_THROW_ON_ERROR);
-    $row = $runtime->execute(['plan_id' => $plan['plan_id'], 'batch' => batch_envelope([
+    $row = execute_formats($runtime, ['plan_id' => $plan['plan_id'], 'batch' => batch_envelope([
         ['correlation' => 'identity', 'input' => $input],
     ])])['results'][0];
     if ($row['correlation'] !== 'identity' || str_contains($row['result_json'], '"instance"')) {

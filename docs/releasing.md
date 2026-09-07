@@ -46,6 +46,16 @@ no Composer runtime hook provisions the module.
 
 For stable source checks, add `--require-stable`. It refuses today's candidate/version,
 publication-disabled metadata, unfrozen Engine ABI and unverified semantic/Engine inputs.
+It also applies the embedded Engine's portable-only Computation Phase 1A prerequisite:
+that release must precede stable Engine publication, independently of the later native
+adapter candidate. The exact baseline version/tag/commit, archive/API/capability/corpus
+SHA256s, released runtime requirements without a native dependency, absence of native
+bindings, and external attestation reference must be recorded in the embedded contract
+matrix as `release-verified`. Missing or unresolved facts refuse stable preparation.
+The current published Computation `v0.2.0`/`v0.2.1` packages and `0.3.0` adapter candidate
+require the native extension and cannot supply that baseline. Re-embedding a reviewed
+candidate does not establish a missing portable release. The source record and unsigned
+provenance preserve this prerequisite, including null/unresolved facts.
 Candidate CI verifies packaging without that option. A stable-source check does not
 independently verify an external release attestation or grant publication authority.
 

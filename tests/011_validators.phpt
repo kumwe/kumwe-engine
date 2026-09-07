@@ -26,7 +26,7 @@ $valid = ['email' => 'reader@example.com', 'url' => 'https://example.com/report?
     'amount' => ['type' => 'exact-decimal', 'value' => '12.30']];
 $invalid = ['email' => 'reader@', 'url' => '/relative', 'uuid' => 'not-a-uuid',
     'label' => 'lower 42', 'amount' => '12.30'];
-$output = $runtime->execute(['plan_id' => $plan['plan_id'], 'batch' => batch_envelope([
+$output = execute_formats($runtime, ['plan_id' => $plan['plan_id'], 'batch' => batch_envelope([
     document('valid', $valid), document('invalid', $invalid), document('reused', $valid),
 ])]);
 echo 'valid:', count($output['results'][0]['findings']), ':', $output['results'][0]['result']['values']['amount'], "\n";
