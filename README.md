@@ -43,3 +43,19 @@ capability before requesting opaque results. It never substitutes a userland exe
 These bounded transports preserve the public arrays, ordered key types, raw bytes, semantic findings
 and logical JSON byte budgets. Direct value-tree batches retain the JSON transport. The C ABI
 contracts and framing belong to the embedded Engine; Zend performs only marshalling and ownership.
+
+The diagnostic-runtime CI artifact captures the already installed PHP 8.5 CLI, curated
+extensions, ELF loader/dependencies and installed package license/version inventory. It
+contains no Kumwe repository code and loads no Kumwe extension by default. Download it
+from the trusted binding run for the exact candidate head, into a private directory, then
+use the verifier from that trusted checkout before executing any captured file:
+
+    python3 tools/diagnostic-runtime.py verify /path/to/fixture --expected-commit FULL_COMMIT_SHA
+    python3 tools/diagnostic-runtime.py verify /path/to/fixture --expected-commit FULL_COMMIT_SHA --activate
+    /path/to/fixture/bin/php -v
+
+Activation restores executable permissions stripped by artifact ZIP downloads only after
+all paths and bytes pass verification. The fixture still uses the host Linux kernel and
+system timezone/DNS/CA data; its manifest records that boundary. Pair it with the separate
+binding-evidence module from the same run for native diagnostics. This inventory is
+diagnostic evidence and makes no release-verification or attestation claim.
