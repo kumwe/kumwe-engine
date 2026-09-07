@@ -322,18 +322,29 @@ PHP_METHOD(Kumwe_Engine_Runtime, release)
     object->source_bytes -= source_size;
 }
 
-/* Canonical tagged transport preserves PHP key kind, raw bytes and IEEE-754 bits.
- * Sorting, escaping, numeric formatting, semantic limits and SHA-256 stay in Engine. */
-/* Base64 is transport only; no normalization or semantic encoding occurs here. */
-static void append_base64(smart_str *output, const char *bytes, size_t length)
+/* KEC1 frames preserve PHP key kind, raw bytes and IEEE-754 bits. Only Engine
+ * performs semantic admission, sorting, escaping, numeric formatting and hashing. */
+static void canonical_u32(char *target, uint32_t value)
 {
-    zend_string *encoded = php_base64_encode((const unsigned char *)bytes, length);
-    smart_str_appendc(output, '"');
-    smart_str_append(output, encoded);
-    smart_str_appendc(output, '"');
-    zend_string_release(encoded);
+    for (unsigned i = 0; i < 4; ++i) { target[i] = (char)(value >> (8U * i)); }
 }
-
+static void canonical_u64(smart_str *output, uint64_t value)
+{
+    char bytes[8];
+    for (unsigned i = 0; i < 8; ++i) { bytes[i] = (char)(value >> (8U * i)); }
+    smart_str_appendl(output, bytes, sizeof(bytes));
+}
+static size_t canonical_frame(smart_str *output, unsigned char tag)
+{
+    const size_t offset = output->s == NULL ? 0 : ZSTR_LEN(output->s);
+    smart_str_appendc(output, (char)tag);
+    smart_str_appendl(output, "\0\0\0\0", 4);
+    return offset;
+}
+static void canonical_finish_frame(smart_str *output, size_t offset)
+{
+    canonical_u32(ZSTR_VAL(output->s) + offset + 1, (uint32_t)(ZSTR_LEN(output->s) - offset - 5));
+}
 static zend_result canonical_encode(zval *input, smart_str *output, unsigned depth, size_t *nodes, size_t *bytes)
 {
     ZVAL_DEREF(input);
@@ -341,65 +352,58 @@ static zend_result canonical_encode(zval *input, smart_str *output, unsigned dep
         binding_failure(KUMWE_ENGINE_V1_EXHAUSTED_LIMIT); return FAILURE;
     }
     if (depth > BINDING_MAX_DEPTH) {
-        smart_str_appends(output, "{\"type\":\"unsupported\"}");
+        (void)canonical_frame(output, 7);
         return SUCCESS; /* Native depth admission precedes unsupported-value admission. */
     }
+    unsigned char tag;
     switch (Z_TYPE_P(input)) {
-        case IS_NULL: smart_str_appends(output, "{\"type\":\"null\"}"); return SUCCESS;
-        case IS_FALSE: smart_str_appends(output, "{\"type\":\"bool\",\"value\":false}"); return SUCCESS;
-        case IS_TRUE: smart_str_appends(output, "{\"type\":\"bool\",\"value\":true}"); return SUCCESS;
-        case IS_LONG:
-            smart_str_appends(output, "{\"type\":\"int\",\"decimal\":\"");
-            smart_str_append_long(output, Z_LVAL_P(input));
-            smart_str_appends(output, "\"}"); return SUCCESS;
+        case IS_NULL: tag = 0; break;
+        case IS_FALSE: tag = 1; break;
+        case IS_TRUE: tag = 2; break;
+        case IS_LONG: tag = 3; break;
+        case IS_DOUBLE: tag = 4; break;
+        case IS_STRING: tag = 5; break;
+        case IS_ARRAY: tag = 6; break;
+        default: tag = 7; break;
+    }
+    const size_t offset = canonical_frame(output, tag);
+    switch (Z_TYPE_P(input)) {
+        case IS_LONG: canonical_u64(output, (uint64_t)Z_LVAL_P(input)); break;
         case IS_DOUBLE: {
             uint64_t bits;
-            char hex[17];
             const double number = Z_DVAL_P(input);
             memcpy(&bits, &number, sizeof(bits));
-            snprintf(hex, sizeof(hex), "%016" PRIx64, bits);
-            smart_str_appends(output, "{\"type\":\"float\",\"hex\":\"");
-            smart_str_appendl(output, hex, 16);
-            smart_str_appends(output, "\"}"); return SUCCESS;
+            canonical_u64(output, bits); break;
         }
         case IS_STRING:
             if (Z_STRLEN_P(input) > (size_t)33554432 - *bytes) { goto exhausted; }
             *bytes += Z_STRLEN_P(input);
-            smart_str_appends(output, "{\"type\":\"string\",\"base64\":");
-            append_base64(output, Z_STRVAL_P(input), Z_STRLEN_P(input));
-            smart_str_appendc(output, '}'); return SUCCESS;
+            smart_str_append(output, Z_STR_P(input)); break;
         case IS_ARRAY: {
             zval *value;
             zend_string *key;
             zend_ulong index;
-            bool first = true;
-            if (zend_hash_num_elements(Z_ARRVAL_P(input)) > BINDING_MAX_NODES - *nodes) { goto exhausted; }
-            smart_str_appends(output, "{\"type\":\"array\",\"entries\":[");
+            const uint32_t count = zend_hash_num_elements(Z_ARRVAL_P(input));
+            if (count > BINDING_MAX_NODES - *nodes) { goto exhausted; }
+            char encoded_count[4]; canonical_u32(encoded_count, count);
+            smart_str_appendl(output, encoded_count, sizeof(encoded_count));
             ZEND_HASH_FOREACH_KEY_VAL(Z_ARRVAL_P(input), index, key, value) {
-                if (key != NULL) {
+                const size_t key_offset = canonical_frame(output, key == NULL ? 3 : 5);
+                if (key == NULL) { canonical_u64(output, (uint64_t)index); }
+                else {
                     if (ZSTR_LEN(key) > (size_t)33554432 - *bytes) { goto exhausted; }
                     *bytes += ZSTR_LEN(key);
+                    smart_str_append(output, key);
                 }
-                if (!first) { smart_str_appendc(output, ','); }
-                first = false;
-                smart_str_appends(output, "{\"key\":{");
-                if (key == NULL) {
-                    smart_str_appends(output, "\"type\":\"int\",\"decimal\":\"");
-                    smart_str_append_long(output, (zend_long)index);
-                    smart_str_appendc(output, '"');
-                } else {
-                    smart_str_appends(output, "\"type\":\"string\",\"base64\":");
-                    append_base64(output, ZSTR_VAL(key), ZSTR_LEN(key));
-                }
-                smart_str_appends(output, "},\"value\":");
+                canonical_finish_frame(output, key_offset);
                 if (canonical_encode(value, output, depth + 1, nodes, bytes) == FAILURE) { return FAILURE; }
-                smart_str_appendc(output, '}');
             } ZEND_HASH_FOREACH_END();
-            smart_str_appends(output, "]}"); return SUCCESS;
+            break;
         }
-        default:
-            smart_str_appends(output, "{\"type\":\"unsupported\"}"); return SUCCESS;
+        default: break;
     }
+    canonical_finish_frame(output, offset);
+    return SUCCESS;
 exhausted:
     binding_failure(KUMWE_ENGINE_V1_EXHAUSTED_LIMIT); return FAILURE;
 }
@@ -415,21 +419,25 @@ static void execute_canonical(zval *envelope, zval *return_value)
     }
     smart_str encoded = {0};
     size_t nodes = 0, bytes = 0, metadata_nodes = 0, metadata_bytes = 0;
+    smart_str_appendl(&encoded, "KEC1\0\0\0\0", 8);
     smart_str_appendc(&encoded, '{');
     for (size_t i = 0; i < 6; ++i) {
-        if (i == 5 && !has_limits) { continue; }
+        if (i == 4 || (i == 5 && !has_limits)) { continue; }
         zval *value = zend_hash_str_find(arguments, keys[i], strlen(keys[i]));
         if (value == NULL) {
             smart_str_free(&encoded); binding_failure(KUMWE_ENGINE_V1_INVALID_INPUT); return;
         }
         if (i != 0) { smart_str_appendc(&encoded, ','); }
         smart_str_appendc(&encoded, '"'); smart_str_appends(&encoded, keys[i]); smart_str_appends(&encoded, "\":");
-        if ((i == 4 ? canonical_encode(value, &encoded, 0, &nodes, &bytes)
-                : encode_checked(value, &encoded, 0, &metadata_nodes, &metadata_bytes, i == 5 ? COPY_MAP : COPY_VALUE)) == FAILURE) {
+        if (encode_checked(value, &encoded, 0, &metadata_nodes, &metadata_bytes, i == 5 ? COPY_MAP : COPY_VALUE) == FAILURE) {
             smart_str_free(&encoded); return;
         }
     }
     smart_str_appendc(&encoded, '}');
+    canonical_u32(ZSTR_VAL(encoded.s) + 4, (uint32_t)(ZSTR_LEN(encoded.s) - 8));
+    if (canonical_encode(original, &encoded, 0, &nodes, &bytes) == FAILURE) {
+        smart_str_free(&encoded); return;
+    }
     if (encoded.s == NULL || ZSTR_LEN(encoded.s) > (size_t)67108864) {
         smart_str_free(&encoded); binding_failure(KUMWE_ENGINE_V1_EXHAUSTED_LIMIT); return;
     }
@@ -513,6 +521,133 @@ static void execute_decimal(zval *envelope, zval *return_value)
     kumwe_engine_v1_buffer_release(&buffer);
 }
 
+/* The framed path carries opaque portable documents without JSON escaping their
+ * already encoded input. Direct value-tree documents retain the JSON path. */
+static zend_result encode_batch(zval *batch, smart_str *encoded, bool *framed)
+{
+    HashTable *root = Z_ARRVAL_P(batch);
+    zval *documents = zend_hash_str_find(root, "documents", sizeof("documents") - 1);
+    zval *limits = zend_hash_str_find(root, "limits", sizeof("limits") - 1);
+    zval *version = zend_hash_str_find(root, "wire_version", sizeof("wire_version") - 1);
+    *framed = false;
+    if (zend_hash_num_elements(root) != 3 || documents == NULL || limits == NULL || version == NULL
+        || Z_TYPE_P(documents) != IS_ARRAY || !zend_array_is_list(Z_ARRVAL_P(documents))) {
+        return encode_envelope(batch, encoded);
+    }
+    zval *document;
+    ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(documents), document) {
+        if (Z_TYPE_P(document) != IS_ARRAY || zend_hash_num_elements(Z_ARRVAL_P(document)) != 2) {
+            return encode_envelope(batch, encoded);
+        }
+        zval *correlation = zend_hash_str_find(Z_ARRVAL_P(document), "correlation", sizeof("correlation") - 1);
+        zval *input = zend_hash_str_find(Z_ARRVAL_P(document), "input", sizeof("input") - 1);
+        if (correlation == NULL || input == NULL || Z_TYPE_P(correlation) != IS_STRING || Z_TYPE_P(input) != IS_STRING) {
+            return encode_envelope(batch, encoded);
+        }
+    } ZEND_HASH_FOREACH_END();
+    /* Same conservative admission charges as encode_checked: root+documents,
+     * all three root keys, each document's map/two strings/two keys, then data. */
+    size_t nodes = 2, bytes = 64 + 6 * (12 + 9 + 6);
+    smart_str_appendl(encoded, "KEB1\0\0\0\0", 8);
+    smart_str_appends(encoded, "{\"wire_version\":");
+    if (encode_checked(version, encoded, 1, &nodes, &bytes, COPY_VALUE) == FAILURE) { goto failure; }
+    smart_str_appends(encoded, ",\"limits\":");
+    if (encode_checked(limits, encoded, 1, &nodes, &bytes, COPY_VALUE) == FAILURE) { goto failure; }
+    smart_str_appendc(encoded, '}');
+    canonical_u32(ZSTR_VAL(encoded->s) + 4, (uint32_t)(ZSTR_LEN(encoded->s) - 8));
+    const uint32_t count = zend_hash_num_elements(Z_ARRVAL_P(documents));
+    if (count > (BINDING_MAX_NODES - nodes) / 3) { goto exhausted; }
+    char length[4]; canonical_u32(length, count); smart_str_appendl(encoded, length, 4);
+    ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(documents), document) {
+        zval *correlation = zend_hash_str_find(Z_ARRVAL_P(document), "correlation", sizeof("correlation") - 1);
+        zval *input = zend_hash_str_find(Z_ARRVAL_P(document), "input", sizeof("input") - 1);
+        if (bytes > BINDING_MAX_BYTES - 192) { goto exhausted; }
+        bytes += 192;
+        zval *strings[] = {correlation, input};
+        for (unsigned i = 0; i < 2; ++i) {
+            const size_t size = Z_STRLEN_P(strings[i]);
+            if (size > (BINDING_MAX_BYTES - bytes) / 6) { goto exhausted; }
+            bytes += size * 6;
+            canonical_u32(length, (uint32_t)size); smart_str_appendl(encoded, length, 4);
+            smart_str_append(encoded, Z_STR_P(strings[i]));
+        }
+    } ZEND_HASH_FOREACH_END();
+    if (ZSTR_LEN(encoded->s) > BINDING_MAX_BYTES) { goto exhausted; }
+    smart_str_0(encoded); *framed = true; return SUCCESS;
+exhausted:
+    binding_failure(KUMWE_ENGINE_V1_EXHAUSTED_LIMIT);
+failure:
+    smart_str_free(encoded); return FAILURE;
+}
+
+static zend_result response_frame(const uint8_t **cursor, size_t *remaining, const char **data, size_t *size)
+{
+    if (*remaining < 4) { return FAILURE; }
+    *size = decimal_u32(*cursor); *cursor += 4; *remaining -= 4;
+    if (*size > *remaining) { return FAILURE; }
+    *data = (const char *)*cursor; *cursor += *size; *remaining -= *size;
+    return SUCCESS;
+}
+/* PHP's JSON scanner requires a NUL-terminated buffer even when a byte count
+ * is supplied. A framed slice ends at another binary frame, so copy it first. */
+static zend_result decode_json_frame(zval *result, const char *bytes, size_t size)
+{
+    if (size == 2 && ((bytes[0] == '[' && bytes[1] == ']') || (bytes[0] == '{' && bytes[1] == '}'))) {
+        array_init(result); return SUCCESS;
+    }
+    zend_string *terminated = zend_string_init(bytes, size, 0);
+    zend_result status = FAILURE;
+    zend_try {
+        // Three parent containers existed around this value in the JSON envelope.
+        status = php_json_decode_ex(result, ZSTR_VAL(terminated), ZSTR_LEN(terminated),
+            PHP_JSON_OBJECT_AS_ARRAY | PHP_JSON_BIGINT_AS_STRING, BINDING_MAX_DEPTH + 5);
+    } zend_catch {
+        zend_string_release(terminated);
+        if (!Z_ISUNDEF_P(result)) { zval_ptr_dtor(result); ZVAL_UNDEF(result); }
+        zend_bailout();
+    } zend_end_try();
+    zend_string_release(terminated);
+    return status;
+}
+
+static zend_result decode_batch_buffer(kumwe_engine_v1_buffer *buffer, zval *result, bool framed)
+{
+    if (!framed) { return decode_buffer(buffer, result, BINDING_MAX_BYTES); }
+    kumwe_engine_v1_view view = {sizeof(kumwe_engine_v1_view), 1, NULL, 0};
+    if (kumwe_engine_v1_buffer_view(buffer, &view) != KUMWE_ENGINE_V1_OK || view.size < 8
+        || view.data == NULL || view.size > BINDING_MAX_BYTES || memcmp(view.data, "KER2", 4) != 0) { goto malformed; }
+    const uint32_t count = decimal_u32(view.data + 4);
+    const uint8_t *cursor = view.data + 8;
+    size_t remaining = (size_t)view.size - 8;
+    if (count > 4096 || count > remaining / 12) { goto malformed; }
+    array_init(result);
+    zval rows; array_init_size(&rows, count); add_assoc_zval(result, "results", &rows);
+    add_assoc_long(result, "wire_version", 1);
+    zval *owned_rows = zend_hash_str_find(Z_ARRVAL_P(result), "results", sizeof("results") - 1);
+    for (uint32_t i = 0; i < count; ++i) {
+        const char *correlation, *findings, *payload;
+        size_t correlation_size, findings_size, payload_size;
+        if (response_frame(&cursor, &remaining, &correlation, &correlation_size) == FAILURE
+            || response_frame(&cursor, &remaining, &findings, &findings_size) == FAILURE
+            || response_frame(&cursor, &remaining, &payload, &payload_size) == FAILURE) { goto malformed; }
+        zval row; array_init(&row); add_next_index_zval(owned_rows, &row);
+        zval *owned_row = zend_hash_index_find(Z_ARRVAL_P(owned_rows), i);
+        add_assoc_stringl(owned_row, "correlation", correlation, correlation_size);
+        zval decoded; ZVAL_UNDEF(&decoded);
+        if (decode_json_frame(&decoded, findings, findings_size) == FAILURE || Z_TYPE(decoded) != IS_ARRAY) { zval_ptr_dtor(&decoded); goto malformed; }
+        add_assoc_zval(owned_row, "findings", &decoded);
+        ZVAL_UNDEF(&decoded);
+        if (decode_json_frame(&decoded, payload, payload_size) == FAILURE || Z_TYPE(decoded) != IS_ARRAY) { zval_ptr_dtor(&decoded); goto malformed; }
+        add_assoc_zval(owned_row, "result", &decoded);
+        add_assoc_stringl(owned_row, "result_json", payload, payload_size);
+    }
+    if (remaining != 0) { goto malformed; }
+    return SUCCESS;
+malformed:
+    if (!Z_ISUNDEF_P(result)) { zval_ptr_dtor(result); ZVAL_UNDEF(result); }
+    binding_failure(KUMWE_ENGINE_V1_INTERNAL_FAILURE); return FAILURE;
+}
+
 PHP_METHOD(Kumwe_Engine_Runtime, execute)
 {
     zval *envelope;
@@ -546,7 +681,8 @@ PHP_METHOD(Kumwe_Engine_Runtime, execute)
     binding_plan *plan = zend_hash_find_ptr(&object->plans, Z_STR_P(identity));
     if (plan == NULL) { binding_failure(KUMWE_ENGINE_V1_INVALID_INPUT); RETURN_THROWS(); }
     smart_str encoded = {0};
-    if (encode_envelope(batch, &encoded) == FAILURE) { RETURN_THROWS(); }
+    bool framed = false;
+    if (encode_batch(batch, &encoded, &framed) == FAILURE) { RETURN_THROWS(); }
     kumwe_engine_v1_view input = {sizeof(kumwe_engine_v1_view), 1,
         (const uint8_t *)ZSTR_VAL(encoded.s), ZSTR_LEN(encoded.s)};
     kumwe_engine_v1_buffer *buffer = NULL;
@@ -563,7 +699,7 @@ PHP_METHOD(Kumwe_Engine_Runtime, execute)
         kumwe_engine_v1_buffer_release(&buffer); binding_failure(status); RETURN_THROWS();
     }
     zend_try {
-        decode_buffer(buffer, return_value, BINDING_MAX_BYTES);
+        decode_batch_buffer(buffer, return_value, framed);
     } zend_catch {
         kumwe_engine_v1_buffer_release(&buffer); zend_bailout();
     } zend_end_try();

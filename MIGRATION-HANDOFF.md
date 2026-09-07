@@ -1,12 +1,12 @@
 # Candidate Zend cross-build handoff
 
-Change sets: NRM-2026-043 and NRM-2026-044. Roadmap impact: None; enabling native binding infrastructure. Draft PR: https://github.com/kumwe/kumwe-engine/pull/3. Phase: candidate cross-build. State: package-implemented candidate; no release or App integration claim.
+Change sets: NRM-2026-043 and NRM-2026-044. Scope: standalone native library and binding delivery. Draft PR: https://github.com/kumwe/kumwe-engine/pull/3. Phase: candidate cross-build. State: package-implemented candidate; no release or App integration claim.
 
 The PIE package `kumwe/kumwe-engine` installs module `kumwe_engine`, exposed to Composer as `ext-kumwe_engine`. Actual native classes are exclusively `Kumwe\Engine\Runtime` and `Kumwe\Engine\Exception\BindingFailure`; stubs cannot autoload. `resources/api/v1.json` defines the public surface. The native reference package retains its historical portable baseline; it does not implement these classes.
 
 Engine source identity is recorded in `resources/engine-lock.json`. This candidate must not merge or publish as stable extension Phase 1: that task requires an immutable Engine release and successful independent release attestation, then a new exact embedded-source lock and final-head extension gates. The current committed source snapshot is a permitted development cross-build, not a release substitute.
 
-CI builds PHP 8.5 NTS Linux x86_64, executes PHPT/canonical corpus parity and Valgrind lifetime checks, and installs the exact source archive through PIE with networking disabled. Source digests and generated arginfo must match. Final evidence is the actual workflow at the final PR head; no local compile is claimed when development headers are unavailable.
+CI builds PHP 8.5 NTS Linux x86_64, executes PHPT/canonical corpus parity and Valgrind lifetime checks, and installs the exact source archive through PIE with networking disabled. Source digests and generated arginfo must match. Final evidence is the actual workflow at the final PR head; local evidence is separate from the final published-head CI gates.
 
 The source closure includes Engine's pinned PCRE2 and Unicode inputs, with no build-time fetch or host PCRE2/ICU dependency. The native module linkage gate permits only the documented C/C++ system runtimes and rejects exported PCRE2 internals. Source replacement requires the previous bundle to match its reviewed file lock and compiled identity before replacing the complete tree; isolated regression cases cover dirty, untracked, symlink and changed-source refusals.
 
