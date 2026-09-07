@@ -6,7 +6,7 @@ The actual extension registers `Kumwe\Engine\Runtime` and `Kumwe\Engine\Exceptio
 
 A Runtime owns at most 64 immutable native plans, with a 16 MiB aggregate source budget. Compile returns an opaque random `plan_id` and the Engine descriptor. Execute takes `plan_id`, a bounded `batch`, and optional `cancelled`. IDs work only with the Runtime that created them. Objects cannot clone, serialize, gain dynamic properties, or outlive their request. Call `release($planId)` when a compiled plan is no longer needed; this reclaims both its slot and exact source-byte budget. A released or foreign ID is refused. Destroying a Runtime releases all remaining plans through the Engine ABI.
 
-Canonical `execute` requests carry the GenericV1 profile, corpus digest, operation, original PHP input, and optional semantic limits. The binding writes PHP value/key types, raw string bytes and IEEE-754 bits directly into bounded tagged transport, without allocating a second PHP value tree. Sorting, escaping, formatting, limits, finding precedence and digest algorithms execute in Engine. Objects and resources become unsupported tags without invoking callbacks; repeated acyclic references are allowed and cycles terminate at the bounded depth boundary.
+Canonical `execute` requests carry the GenericV1 profile, corpus digest, operation, original PHP input, and optional semantic limits. The binding writes PHP value/key types, raw string bytes and IEEE-754 bits directly into bounded binary value frames, without allocating a second PHP value tree. Sorting, escaping, formatting, limits, finding precedence and digest algorithms execute in Engine. Objects and resources become unsupported tags without invoking callbacks; repeated acyclic references are allowed and cycles terminate at the bounded depth boundary.
 
 Decimal batch `execute` requests contain exactly `wire_version: 1`, `profile: "decimal-batch-draft/1"`, the committed decimal corpus SHA-256, and `input` holding opaque KED1 bytes. The result contains the same wire/profile and opaque KER1 `result` bytes. All four decimal operations, row ordering, rounding, refusal codes and resource budgets remain owned by the [embedded Engine ABI](vendor/engine/docs/abi.md). The binding limits each input/output to 1 MiB and never interprets decimal values.
 
@@ -28,4 +28,9 @@ CI also installs the exact Git source archive using PIE inside a network namespa
 
 The nearest semantic Composer package owns its interface adapter. App owns database access, authorization, HTTP, reference resolution and protected execution. This repository has no algorithms, fallback, FFI, user callbacks, subprocess runtime, or Composer interfaces registered at MINIT.
 
-See [migration handoff](MIGRATION-HANDOFF.md), [memory ownership](docs/memory.md), and [candidate compatibility](resources/compatibility/v1.json). No release, App adoption or roadmap completion is claimed.
+See [migration handoff](MIGRATION-HANDOFF.md), [memory ownership](docs/memory.md), and [candidate compatibility](resources/compatibility/v1.json). Release and App adoption gates remain open.
+
+Opaque compiled documents use KEB1/KER2 framing internally; canonical PHP values use KEC1 frames.
+These bounded transports preserve the public arrays, ordered key types, raw bytes, semantic findings
+and logical JSON byte budgets. Direct value-tree batches retain the JSON transport. The C ABI
+contracts and framing belong to the embedded Engine; Zend performs only marshalling and ownership.
