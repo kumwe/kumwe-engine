@@ -10,9 +10,50 @@
   "architecture": "x86_64",
   "distribution": "self-contained-source",
   "abi_major": 1,
-  "statuses": {"0": "result", "1": "BindingFailure:1", "2": "BindingFailure:2", "3": "BindingFailure:3", "4": "BindingFailure:4", "5": "BindingFailure:5", "6": "BindingFailure:6", "7": "BindingFailure:7", "8": "BindingFailure:8"},
+  "statuses": {
+    "0": "result",
+    "1": "BindingFailure:1",
+    "2": "BindingFailure:2",
+    "3": "BindingFailure:3",
+    "4": "BindingFailure:4",
+    "5": "BindingFailure:5",
+    "6": "BindingFailure:6",
+    "7": "BindingFailure:7",
+    "8": "BindingFailure:8"
+  },
   "finding_policy": "native portable findings preserved without translation",
   "fallback": false,
   "persistent_cache": false,
-  "publication_allowed": false
+  "publication_allowed": false,
+  "abi_minor": 0,
+  "abi_manifest": "vendor/engine/resources/abi-manifest.json",
+  "build_identity": {
+    "schema": "kumwe-zend-build/v1",
+    "record": "build-identity.json",
+    "runtime_field": "binding_build",
+    "runtime_digest_field": "binding_build_digest",
+    "exact_fields": [
+      "php_version",
+      "php_version_id",
+      "zend_module_api",
+      "thread_model",
+      "os",
+      "os_release",
+      "architecture",
+      "host",
+      "libc",
+      "compiler",
+      "linker",
+      "extension_flags",
+      "engine_flags",
+      "php_configure_options",
+      "debug",
+      "sanitizers",
+      "distribution",
+      "abi_major",
+      "abi_minor",
+      "abi_manifest_sha256",
+      "extension_source_sha256"
+    ]
+  }
 }

@@ -21,11 +21,13 @@ jobs:
           php tools/generate-arginfo.php --check
           php tools/verify-binding.php
           php tools/verify-engine.php
+          python3 tools/test-embed-engine.py
       - name: Build actual PHP extension
         run: |
           phpize
           ./configure --enable-kumwe_engine
           make -j2
+          python3 tools/verify-native-linkage.py
       - name: Record independent source compatibility tuple
         run: php tools/expected-tuple.php > candidate-compatibility.json
       - name: Execute PHPT and corpus parity
@@ -47,11 +49,73 @@ jobs:
           path: |
             candidate-tuple.json
             candidate-compatibility.json
+            build-identity.json
             resources/engine-lock.json
             modules/kumwe_engine.so
             tests/*.diff
             tests/*.out
             config.log
+  address-undefined-sanitizers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CC: clang
+      CXX: clang++
+      USE_ZEND_ALLOC: '0'
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:abort_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+      NO_INTERACTION: '1'
+      REPORT_EXIT_STATUS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out exact PHP 8.5.10 sanitizer host
+        uses: actions/checkout@v4
+        with:
+          repository: php/php-src
+          ref: 34308a6666b2d489c509541ea9befea9e2b42348
+          path: sanitizer-php-source
+      - name: Install source build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y autoconf bison re2c pkg-config
+          clang --version
+      - name: Build actual instrumented PHP executable and development headers
+        working-directory: sanitizer-php-source
+        run: |
+          ./buildconf --force
+          ./configure --prefix="$RUNNER_TEMP/kumwe-sanitized-php" \
+            --disable-all --enable-cli --disable-cgi --disable-phpdbg --without-pear \
+            --enable-debug --enable-address-sanitizer --enable-undefined-sanitizer
+          make -j2
+          make install
+          "$RUNNER_TEMP/kumwe-sanitized-php/bin/php" -n -v
+          echo "$RUNNER_TEMP/kumwe-sanitized-php/bin" >> "$GITHUB_PATH"
+      - name: Build instrumented Zend binding and complete embedded Engine
+        env:
+          CFLAGS: -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -DZEND_TRACK_ARENA_ALLOC
+          CXXFLAGS: -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer
+          LDFLAGS: -fsanitize=address,undefined
+        run: |
+          php -n tools/verify-engine.php
+          phpize
+          ./configure --enable-kumwe_engine --with-php-config="$RUNNER_TEMP/kumwe-sanitized-php/bin/php-config"
+          make -j2
+          php -n -d extension="$PWD/modules/kumwe_engine.so" tools/consumer.php
+      - name: Execute public PHPT corpora and native allocation lifecycle
+        run: |
+          make test TESTS='tests' TEST_PHP_ARGS='-q'
+          php -n -d extension="$PWD/modules/kumwe_engine.so" tools/lifecycle.php
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: address-undefined-sanitizer-evidence
+          path: |
+            tests/*.diff
+            tests/*.out
+            config.log
+            engine-build/CMakeCache.txt
+            build-identity.json
+            sanitizer-php-source/config.log
   clean-pie:
     runs-on: ubuntu-24.04
     timeout-minutes: 20

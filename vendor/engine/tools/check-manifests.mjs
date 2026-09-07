@@ -17,12 +17,24 @@ function repositoryFile(path) {
 const abi = read('resources/abi-symbols.txt').trim().split('\n');
 const declared = [...read('include/kumwe/engine/engine.h').matchAll(/KUMWE_ENGINE_API (?:kumwe_engine_v1_status|void) (kumwe_engine_v1_\w+)\(/g)].map(item => item[1]).sort();
 assert.deepEqual(declared, abi, 'Every public function must have exactly one manifest owner');
+const abiManifest = JSON.parse(read('resources/abi-manifest.json'));
+assert.equal(abiManifest.schema, 'kumwe-engine-abi/v1');
+assert.equal(abiManifest.abi_major, 1);
+assert.equal(abiManifest.abi_minor, 0);
+assert.equal(abiManifest.status, 'unstable-development');
+assert.equal(abiManifest.paths_relative_to, 'source_archive_root');
+assert.deepEqual(Object.keys(abiManifest.files), ['include/kumwe/engine/engine.h', 'resources/abi-symbols.txt', 'resources/abi-symbols.map', 'docs/abi.md']);
+for (const [path, digest] of Object.entries(abiManifest.files)) {
+  repositoryFile(path);
+  assert.equal(createHash('sha256').update(readFileSync(path)).digest('hex'), digest, `Stale ABI manifest ${path}`);
+}
+const abiManifestDigest = createHash('sha256').update(readFileSync('resources/abi-manifest.json')).digest('hex');
 const statuses = [...read('include/kumwe/engine/engine.h').matchAll(/#define KUMWE_ENGINE_V1_(\w+) UINT32_C\((\d+)\)/g)].map(match => [match[1],Number(match[2])]);
 assert.deepEqual(statuses, [['OK',0],['INVALID_INPUT',1],['UNSUPPORTED_VERSION',2],['INCOMPATIBLE_CAPABILITY',3],['INCOMPATIBLE_CORPUS',4],['INVALID_PROGRAM',5],['EXHAUSTED_LIMIT',6],['CANCELLED',7],['INTERNAL_FAILURE',8]], 'Draft status registry must change deliberately');
 const handoff = read('MIGRATION-HANDOFF.md').match(/\n  public_manifests:\n([\s\S]*?)\n  intentionally_excluded:/)?.[1];
 assert.ok(handoff, 'Native handoff must bind the public manifests');
 const handoffEntries = [...handoff.matchAll(/path: \"([^\"]+)\"\n\s+sha256: \"([a-f0-9]{64})\"/g)];
-assert.deepEqual(handoffEntries.map(entry => entry[1]), ['resources/abi-symbols.txt','resources/capabilities.json','resources/contracts.json','tests/ownership.json','include/kumwe/engine/engine.h']);
+assert.deepEqual(handoffEntries.map(entry => entry[1]), ['resources/abi-manifest.json','resources/abi-symbols.txt','resources/capabilities.json','resources/contracts.json','tests/ownership.json','include/kumwe/engine/engine.h']);
 for (const [,path,digest] of handoffEntries) assert.equal(createHash('sha256').update(readFileSync(path)).digest('hex'),digest, `Stale handoff manifest ${path}`);
 const inventory = JSON.parse(execFileSync('ctest', ['--test-dir',process.argv[2] ?? 'build','--show-only=json-v1'], {encoding:'utf8'}));
 const names = new Set(inventory.tests.map(test => test.name));
@@ -83,14 +95,45 @@ const capabilities = JSON.parse(read('resources/capabilities.json'));
 assert.equal(capabilities.corpus_sha256, decimal.corpus_sha256);
 assert.equal(capabilities.semantic_source, decimal.semantic_source);
 assert.equal(capabilities.semantic_release_verified, false);
-assert.deepEqual(capabilities.capabilities, ['decimal-batch-draft/1', ...contracts.modules.slice(1).map(module => module.profile)]);
+assert.deepEqual(capabilities.capabilities, ['decimal-batch-draft/1', ...contracts.modules.slice(1).flatMap(module => module.profiles ?? [module.profile])]);
 for (const module of contracts.modules) {
   assert.equal(createHash('sha256').update(readFileSync(module.corpus)).digest('hex'), module.corpus_sha256);
   assert.equal(module.release_verified, false);
+}
+assert.deepEqual(capabilities.corpora.map(corpus => corpus.path), ownership.conformance.corpora,
+  'Every advertised corpus must have exactly one conformance owner');
+assert.equal(new Set(capabilities.corpora.map(corpus => corpus.path)).size, capabilities.corpora.length);
+for (const corpus of capabilities.corpora) {
+  repositoryFile(corpus.path);
+  assert.equal(createHash('sha256').update(readFileSync(corpus.path)).digest('hex'), corpus.sha256,
+    `Stale runtime corpus ${corpus.path}`);
+}
+const document = contracts.modules.find(module => module.module === 'document_batch');
+const bundle = JSON.parse(read(document.corpus));
+assert.equal(bundle.schema, 'kumwe-document-profile-corpus/v1');
+assert.equal(bundle.profile, document.profile);
+assert.ok(Array.isArray(bundle.corpora) && bundle.corpora.length >= 4);
+assert.equal(new Set(bundle.corpora.map(corpus => corpus.id)).size, bundle.corpora.length);
+for (const corpus of bundle.corpora) {
+  assert.match(corpus.id, /^[a-z][a-z0-9-]*$/);
+  const path = `corpus/document/${corpus.id}.json`;
+  repositoryFile(path);
+  assert.equal(createHash('sha256').update(readFileSync(path)).digest('hex'), corpus.sha256);
+  assert.ok(capabilities.corpora.some(entry => entry.path === path && entry.sha256 === corpus.sha256));
+}
+assert.equal(createHash('sha256').update(readFileSync(document.preparation_corpus)).digest('hex'), document.preparation_corpus_sha256);
+for (const contract of capabilities.computation.contracts) {
+  const owner = contracts.modules.find(module => (module.profiles ?? [module.profile]).includes(contract.profile));
+  assert.ok(owner, `Unknown runtime semantic profile ${contract.profile}`);
+  assert.equal(contract.corpus_digest, contract.profile === 'normalized-preparation-draft/1'
+    ? owner.preparation_corpus_sha256 : owner.corpus_sha256);
 }
 const runtime = JSON.parse(execFileSync(resolve(process.argv[2] ?? 'build', 'kumwe-engine-conformance'), [], {encoding:'utf8'}));
 assert.match(runtime.computation.build_digest, /^[a-f0-9]{64}$/);
 assert.equal(runtime.completion_claim, false);
 assert.equal(runtime.semantic_release_verified, false);
+assert.equal(runtime.abi_major, abiManifest.abi_major);
+assert.equal(runtime.abi_minor, abiManifest.abi_minor);
+assert.equal(runtime.abi_manifest_sha256, abiManifestDigest);
 assert.deepEqual(runtime.computation.contracts, capabilities.computation.contracts);
 console.log(`${abi.length} ABI exports own behavior/boundary tests; exact corpus and nine negative ownership fixtures passed`);

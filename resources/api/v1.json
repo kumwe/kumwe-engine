@@ -6,7 +6,52 @@
   "platform": "ext-kumwe_engine",
   "runtime": "zend",
   "classes": {
-    "Kumwe\\Engine\\Runtime": {"final": true, "cloneable": false, "serializable": false, "methods": ["capabilities(): array", "compile(array $envelope): array", "execute(array $envelope): array"]},
-    "Kumwe\\Engine\\Exception\\BindingFailure": {"final": true, "extends": "RuntimeException", "methods": []}
+    "Kumwe\\Engine\\Runtime": {
+      "final": true,
+      "cloneable": false,
+      "serializable": false,
+      "methods": [
+        "capabilities(): array",
+        "compile(array $envelope): array",
+        "execute(array $envelope): array"
+      ]
+    },
+    "Kumwe\\Engine\\Exception\\BindingFailure": {
+      "final": true,
+      "extends": "RuntimeException",
+      "methods": []
+    }
+  },
+  "execute_profiles": {
+    "decimal-batch-draft/1": {
+      "request_fields": [
+        "wire_version",
+        "profile",
+        "corpus_digest",
+        "input"
+      ],
+      "input": "opaque KED1 binary from Engine ABI v1",
+      "result_fields": [
+        "wire_version",
+        "profile",
+        "result"
+      ],
+      "result": "opaque KER1 binary from Engine ABI v1",
+      "maximum_input_bytes": 1048576,
+      "maximum_output_bytes": 1048576
+    },
+    "kumwe-canonical-json/generic-v1": {
+      "input": "original PHP values transported as native typed tags"
+    },
+    "compiled-plan": {
+      "input": "Runtime-owned plan_id and bounded batch envelope"
+    }
+  },
+  "build_handshake": {
+    "record": "binding_build",
+    "digest": "binding_build_digest",
+    "schema": "kumwe-zend-build/v1",
+    "expected_record": "build-identity.json",
+    "generation": "configure, independently from source and selected compilers; never queried from the extension"
   }
 }
