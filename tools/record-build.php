@@ -21,7 +21,13 @@ $run = static function (array $command): string {
     return trim($output);
 };
 $phpVersion = $run([$phpConfig, '--version']);
-$zendApi = $run([$phpConfig, '--phpapi']);
+// --phpapi is a distro extension, absent from the pinned upstream PHP build.
+$includeRoot = $run([$phpConfig, '--include-dir']);
+$zendHeader = file_get_contents($includeRoot . '/Zend/zend_modules.h');
+if (!is_string($zendHeader) || preg_match('/^#define[ \t]+ZEND_MODULE_API_NO[ \t]+([0-9]+)[ \t]*$/m', $zendHeader, $apiMatch) !== 1) {
+    throw new RuntimeException('The selected PHP development headers have no exact Zend module API.');
+}
+$zendApi = $apiMatch[1];
 if ($phpVersion !== PHP_VERSION || preg_match('/^[0-9]+$/D', $zendApi) !== 1 || PHP_ZTS || PHP_OS_FAMILY !== 'Linux'
     || php_uname('m') !== 'x86_64' || PHP_INT_SIZE !== 8) {
     throw new RuntimeException('Unverified PHP or target build tuple.');
