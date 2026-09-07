@@ -1,6 +1,6 @@
 # Candidate Zend cross-build handoff
 
-Change sets: NRM-2026-043 and NRM-2026-044. Roadmap impact: None; enabling native binding infrastructure. Draft PR: https://github.com/kumwe/kumwe-engine/pull/1. Phase: candidate cross-build. State: package-implemented candidate; no release or App integration claim.
+Change sets: NRM-2026-043 and NRM-2026-044. Roadmap impact: None; enabling native binding infrastructure. Draft PR: https://github.com/kumwe/kumwe-engine/pull/3. Phase: candidate cross-build. State: package-implemented candidate; no release or App integration claim.
 
 The PIE package `kumwe/kumwe-engine` installs module `kumwe_engine`, exposed to Composer as `ext-kumwe_engine`. Actual native classes are exclusively `Kumwe\Engine\Runtime` and `Kumwe\Engine\Exception\BindingFailure`; stubs cannot autoload. `resources/api/v1.json` defines the public surface. The native reference package retains its historical portable baseline; it does not implement these classes.
 
