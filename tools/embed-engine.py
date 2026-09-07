@@ -10,8 +10,8 @@ import sys
 import tarfile
 
 root = pathlib.Path(__file__).resolve().parent.parent
-if len(sys.argv) != 3 or re.fullmatch(r'[0-9a-f]{40}', sys.argv[2]) is None:
-    raise SystemExit('Usage: embed-engine.py ENGINE_REPOSITORY FULL_COMMIT')
+if len(sys.argv) not in (3, 4) or re.fullmatch(r'[0-9a-f]{40}', sys.argv[2]) is None or (len(sys.argv) == 4 and sys.argv[3] != '--same-source'):
+    raise SystemExit('Usage: embed-engine.py ENGINE_REPOSITORY FULL_COMMIT [--same-source]')
 source, commit = pathlib.Path(sys.argv[1]).resolve(), sys.argv[2]
 if subprocess.check_output(['git', '-C', str(source), 'rev-parse', commit], text=True).strip() != commit:
     raise SystemExit('A complete committed source identity is required.')
@@ -27,12 +27,17 @@ with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
             entries.append((member.name, content, member.mode))
 target = root / 'vendor' / 'engine'
 if target.exists():
-    raise SystemExit('Existing Engine bundle must be reviewed and removed explicitly before replacement.')
-for name, content, mode in entries:
-    path = target / name
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(content)
-    path.chmod(mode)
+    if len(sys.argv) != 4:
+        raise SystemExit('Existing bundle needs explicit --same-source provenance refresh.')
+    actual = {str(path.relative_to(target)): path.read_bytes() for path in target.rglob('*') if path.is_file()}
+    if any(path.is_symlink() for path in target.rglob('*')) or actual != {name: content for name, content, mode in entries}:
+        raise SystemExit('Provenance refresh requires an identical existing source tree.')
+else:
+    for name, content, mode in entries:
+        path = target / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+        path.chmod(mode)
 manifest = {
     'schema': 'kumwe-embedded-engine/v1', 'state': 'candidate',
     'repository': 'https://github.com/kumwe/engine', 'commit': commit,

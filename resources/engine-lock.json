@@ -2,9 +2,9 @@
   "schema": "kumwe-embedded-engine/v1",
   "state": "candidate",
   "repository": "https://github.com/kumwe/engine",
-  "commit": "cb723c4ddfa5e4e39de8654a90914ab44c785741",
+  "commit": "72072416df2b1db706d84c99c9690ef946612b3e",
   "release": null,
-  "archive_sha256": "7126a0c9a3a0edcfc4ad474d31f90f0df59b4a7d48b3957cd3e1f4abb621b857",
+  "archive_sha256": "615e1ce2913ca47bad8c1c748ded756fdaafff325e4177156fcc4cc82f7af1b1",
   "files": {
     ".github/workflows/ci.yml": "441737b8464420c6f9b02721a229df10961a4bdf1b7aededc3eaea6411d3b1e3",
     ".gitignore": "f9bb25c955d5d88309412f9592e65acc9176837acce3da9063d9e86c21c0712f",
