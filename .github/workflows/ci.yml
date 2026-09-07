@@ -28,8 +28,12 @@ jobs:
           ./configure --enable-kumwe_engine
           make -j2
           python3 tools/verify-native-linkage.py
-      - name: Record independent source compatibility tuple
-        run: php tools/expected-tuple.php > candidate-compatibility.json
+      - name: Record independent source and standalone Engine CLI compatibility
+        run: |
+          php tools/expected-tuple.php > candidate-compatibility.json
+          cmake --build engine-build --target kumwe-engine-conformance --parallel 2
+          engine-build/kumwe-engine-conformance --capabilities > engine-cli-capabilities.json
+          php -n tools/verify-cli-tuple.php
       - name: Execute PHPT and corpus parity
         env:
           NO_INTERACTION: '1'
@@ -51,6 +55,7 @@ jobs:
           path: |
             candidate-tuple.json
             candidate-compatibility.json
+            engine-cli-capabilities.json
             build-identity.json
             resources/engine-lock.json
             modules/kumwe_engine.so
