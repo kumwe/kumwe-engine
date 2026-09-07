@@ -83,6 +83,10 @@ jobs:
           clang --version
       - name: Build actual instrumented PHP executable and development headers
         working-directory: sanitizer-php-source
+        env:
+          # The C PHP host must export the C++ sanitizer handlers used by Engine.
+          LDFLAGS: -fsanitize-link-c++-runtime
+          LIBS: -lstdc++
         run: |
           ./buildconf --force
           ./configure --prefix="$RUNNER_TEMP/kumwe-sanitized-php" \
@@ -91,6 +95,7 @@ jobs:
           make -j2
           make install
           "$RUNNER_TEMP/kumwe-sanitized-php/bin/php" -n -v
+          nm -D "$RUNNER_TEMP/kumwe-sanitized-php/bin/php" | grep '__ubsan_vptr_type_cache$'
           echo "$RUNNER_TEMP/kumwe-sanitized-php/bin" >> "$GITHUB_PATH"
       - name: Build instrumented Zend binding and complete embedded Engine
         env:
