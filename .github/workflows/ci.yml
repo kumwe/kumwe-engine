@@ -27,10 +27,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
         with:
           php-version: '8.5'
           coverage: none
+          extensions: ctype, tokenizer, phar, fileinfo, iconv, mbstring, intl, curl, dom, simplexml, xml, xmlreader, xmlwriter, zip, pdo, sodium
           tools: composer:v2
       - name: Verify committed source and generated API
         run: |
@@ -65,12 +68,40 @@ jobs:
           USE_ZEND_ALLOC=0 valgrind --error-exitcode=97 --leak-check=full --errors-for-leak-kinds=definite php -n -d extension="$PWD/modules/kumwe_engine.so" tools/lifecycle.php
       - name: Record tested tuple
         run: php -n -d extension="$PWD/modules/kumwe_engine.so" tools/consumer.php > candidate-tuple.json
+      - name: Capture and verify a relocatable diagnostic PHP runtime
+        run: |
+          python3 tools/diagnostic-runtime.py self-test
+          python3 tools/diagnostic-runtime.py capture "$RUNNER_TEMP/diagnostic-capture" --module "$PWD/modules/kumwe_engine.so"
+          mv "$RUNNER_TEMP/diagnostic-capture" "$RUNNER_TEMP/diagnostic runtime"
+          fixture="$RUNNER_TEMP/diagnostic runtime"
+          # Simulate ZIP's normalized modes before explicit verified activation.
+          find "$fixture" -type f -exec chmod 0644 {} +
+          python3 tools/diagnostic-runtime.py verify "$fixture" --expected-commit "$(git rev-parse HEAD)"
+          python3 tools/diagnostic-runtime.py verify "$fixture" --expected-commit "$(git rev-parse HEAD)" --activate
+          "$fixture/bin/php" -r '
+            $record = json_decode(file_get_contents($argv[1]), true, 64, JSON_THROW_ON_ERROR);
+            foreach ($record["required_extensions"] as $name) {
+                if (!extension_loaded($name)) { throw new RuntimeException("Missing captured PHP extension: " . $name); }
+            }
+            if (PHP_VERSION !== $record["php"]["version"] || extension_loaded("kumwe_engine")) {
+                throw new RuntimeException("Diagnostic PHP version/default-module mismatch.");
+            }
+            echo "Captured PHP and all required extensions loaded without native defaults.\n";
+          ' "$fixture/fixture.json"
+          "$fixture/bin/php" -d extension="$PWD/modules/kumwe_engine.so" tools/consumer.php > diagnostic-runtime-consumer.json
+          python3 -c 'import json; assert json.load(open("candidate-tuple.json")) == json.load(open("diagnostic-runtime-consumer.json")), "Relocated runtime changed the exact consumer tuple"'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: diagnostic-runtime
+          path: ${{ runner.temp }}/diagnostic runtime
+          if-no-files-found: error
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: binding-evidence
           path: |
             candidate-tuple.json
+            diagnostic-runtime-consumer.json
             candidate-compatibility.json
             engine-cli-capabilities.json
             build-identity.json
