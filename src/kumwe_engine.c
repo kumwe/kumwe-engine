@@ -13,6 +13,7 @@
 #include <float.h>
 #include "php_kumwe_engine.h"
 #include "php_kumwe_engine_build.h"
+#include "kumwe_engine_build_config.h"
 #include <kumwe/engine/engine.h>
 #include <stdint.h>
 #include <string.h>
@@ -219,6 +220,18 @@ PHP_METHOD(Kumwe_Engine_Runtime, capabilities)
     }
     zend_try {
         if (decode_buffer(buffer, return_value, BINDING_MAX_BYTES) == SUCCESS) {
+            zval build;
+            ZVAL_UNDEF(&build);
+            if (php_json_decode_ex(&build, KUMWE_BINDING_BUILD_JSON, sizeof(KUMWE_BINDING_BUILD_JSON) - 1,
+                    PHP_JSON_OBJECT_AS_ARRAY, 32) == FAILURE || Z_TYPE(build) != IS_ARRAY) {
+                if (!Z_ISUNDEF(build)) { zval_ptr_dtor(&build); }
+                binding_failure(KUMWE_ENGINE_V1_INTERNAL_FAILURE);
+            } else {
+                add_assoc_zval(return_value, "binding_build", &build);
+                add_assoc_string(return_value, "binding_build_digest", KUMWE_BINDING_BUILD_SHA256);
+            }
+            add_assoc_string(return_value, "extension_package", "kumwe/kumwe-engine");
+            add_assoc_string(return_value, "extension_module", "kumwe_engine");
             add_assoc_string(return_value, "extension_version", PHP_KUMWE_ENGINE_VERSION);
             add_assoc_string(return_value, "embedded_engine_commit", KUMWE_EMBEDDED_ENGINE_COMMIT);
             add_assoc_string(return_value, "embedded_source_sha256", KUMWE_EMBEDDED_ENGINE_SHA256);
@@ -423,6 +436,69 @@ static void execute_canonical(zval *envelope, zval *return_value)
     kumwe_engine_v1_buffer_release(&buffer);
 }
 
+static uint32_t decimal_u32(const uint8_t *bytes)
+{
+    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8)
+        | ((uint32_t)bytes[2] << 16) | ((uint32_t)bytes[3] << 24);
+}
+
+/* KED1/KER1 bytes are an opaque, bounded Engine ABI transport. No decimal
+ * interpretation, rounding, arithmetic or string normalization occurs here. */
+static void execute_decimal(zval *envelope, zval *return_value)
+{
+    HashTable *arguments = Z_ARRVAL_P(envelope);
+    zval *version = zend_hash_str_find(arguments, "wire_version", sizeof("wire_version") - 1);
+    zval *corpus = zend_hash_str_find(arguments, "corpus_digest", sizeof("corpus_digest") - 1);
+    zval *payload = zend_hash_str_find(arguments, "input", sizeof("input") - 1);
+    if (zend_hash_num_elements(arguments) != 4 || version == NULL || Z_TYPE_P(version) != IS_LONG
+        || corpus == NULL || Z_TYPE_P(corpus) != IS_STRING || payload == NULL || Z_TYPE_P(payload) != IS_STRING) {
+        binding_failure(KUMWE_ENGINE_V1_INVALID_INPUT); return;
+    }
+    if (Z_LVAL_P(version) != 1) { binding_failure(KUMWE_ENGINE_V1_UNSUPPORTED_VERSION); return; }
+    if (!zend_string_equals_literal(Z_STR_P(corpus), KUMWE_BINDING_DECIMAL_CORPUS)) {
+        binding_failure(KUMWE_ENGINE_V1_INCOMPATIBLE_CORPUS); return;
+    }
+    if (Z_STRLEN_P(payload) > (size_t)1048576) {
+        binding_failure(KUMWE_ENGINE_V1_EXHAUSTED_LIMIT); return;
+    }
+    kumwe_engine_v1_view input = {sizeof(kumwe_engine_v1_view), 1,
+        (const uint8_t *)Z_STRVAL_P(payload), Z_STRLEN_P(payload)};
+    kumwe_engine_v1_buffer *buffer = NULL;
+    const kumwe_engine_v1_status status = kumwe_engine_v1_decimal_batch(&input, &buffer);
+    if (status != KUMWE_ENGINE_V1_OK) {
+        kumwe_engine_v1_buffer_release(&buffer); binding_failure(status); return;
+    }
+    kumwe_engine_v1_view output = {sizeof(kumwe_engine_v1_view), 1, NULL, 0};
+    bool valid = kumwe_engine_v1_buffer_view(buffer, &output) == KUMWE_ENGINE_V1_OK
+        && input.size >= 20 && output.data != NULL && output.size >= 8 && output.size <= 1048576
+        && memcmp(output.data, "KER1", 4) == 0;
+    size_t offset = 8;
+    if (valid) {
+        const uint32_t count = decimal_u32(output.data + 4);
+        valid = count > 0 && count <= 4096 && count == decimal_u32(input.data + 4);
+        for (uint32_t row = 0; valid && row < count; ++row) {
+            if (output.size - offset < 4) { valid = false; break; }
+            const uint32_t length = decimal_u32(output.data + offset);
+            offset += 4;
+            if (length == 0 || length > 68 || length > output.size - offset) { valid = false; break; }
+            offset += length;
+        }
+        valid = valid && offset == output.size;
+    }
+    if (!valid) {
+        kumwe_engine_v1_buffer_release(&buffer); binding_failure(KUMWE_ENGINE_V1_INTERNAL_FAILURE); return;
+    }
+    zend_try {
+        array_init(return_value);
+        add_assoc_long(return_value, "wire_version", 1);
+        add_assoc_string(return_value, "profile", "decimal-batch-draft/1");
+        add_assoc_stringl(return_value, "result", (const char *)output.data, (size_t)output.size);
+    } zend_catch {
+        kumwe_engine_v1_buffer_release(&buffer); zend_bailout();
+    } zend_end_try();
+    kumwe_engine_v1_buffer_release(&buffer);
+}
+
 PHP_METHOD(Kumwe_Engine_Runtime, execute)
 {
     zval *envelope;
@@ -434,6 +510,12 @@ PHP_METHOD(Kumwe_Engine_Runtime, execute)
     if (profile != NULL && Z_TYPE_P(profile) == IS_STRING
         && zend_string_equals_literal(Z_STR_P(profile), "kumwe-canonical-json/generic-v1")) {
         execute_canonical(envelope, return_value);
+        if (EG(exception)) { RETURN_THROWS(); }
+        return;
+    }
+    if (profile != NULL && Z_TYPE_P(profile) == IS_STRING
+        && zend_string_equals_literal(Z_STR_P(profile), "decimal-batch-draft/1")) {
+        execute_decimal(envelope, return_value);
         if (EG(exception)) { RETURN_THROWS(); }
         return;
     }

@@ -31,3 +31,6 @@
 /tests/*.out
 /tests/*.php
 /tests/*.sh
+
+/build-identity.json
+/kumwe_engine_build_config.h

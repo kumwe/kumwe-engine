@@ -11,8 +11,10 @@ if test "$PHP_KUMWE_ENGINE" != "no"; then
   AS_IF([test "$CMAKE" = "no"], [AC_MSG_ERROR([CMake 3.25 or newer is required])])
   KUMWE_PHP_EXECUTABLE=`$PHP_CONFIG --php-binary`
   "$KUMWE_PHP_EXECUTABLE" "$srcdir/tools/verify-engine.php" || AC_MSG_ERROR([Embedded Engine verification failed])
-  $CMAKE -S "$srcdir/vendor/engine" -B "$ac_pwd/engine-build" -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release || AC_MSG_ERROR([Embedded Engine configuration failed])
+  $CMAKE -G "Unix Makefiles" -S "$srcdir/vendor/engine" -B "$ac_pwd/engine-build" -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release || AC_MSG_ERROR([Embedded Engine configuration failed])
   $CMAKE --build "$ac_pwd/engine-build" --target kumwe_engine --parallel 2 || AC_MSG_ERROR([Embedded Engine compilation failed])
+  "$KUMWE_PHP_EXECUTABLE" "$srcdir/tools/record-build.php" "$srcdir" "$ac_pwd" "$PHP_CONFIG" "$CC" "$CFLAGS" "$CPPFLAGS" "$LDFLAGS" "$CXX" "$host" "$LD" || AC_MSG_ERROR([Binding build identity could not be verified])
+  PHP_ADD_INCLUDE([$ac_pwd])
   PHP_NEW_EXTENSION([kumwe_engine], [src/kumwe_engine.c], [$ext_shared],, [-std=c11 -Wall -Wextra -fstack-protector-strong])
   PHP_ADD_INCLUDE([$ext_srcdir])
   PHP_ADD_INCLUDE([$ext_srcdir/src])
