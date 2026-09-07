@@ -26,6 +26,8 @@ jobs:
           phpize
           ./configure --enable-kumwe_engine
           make -j2
+      - name: Record independent source compatibility tuple
+        run: php tools/expected-tuple.php > candidate-compatibility.json
       - name: Execute PHPT and corpus parity
         env:
           NO_INTERACTION: '1'
@@ -44,6 +46,9 @@ jobs:
           name: binding-evidence
           path: |
             candidate-tuple.json
+            candidate-compatibility.json
+            resources/engine-lock.json
+            modules/kumwe_engine.so
             tests/*.diff
             tests/*.out
             config.log

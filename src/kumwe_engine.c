@@ -20,6 +20,9 @@
 #if PHP_VERSION_ID < 80500 || PHP_VERSION_ID >= 80600
 #error This candidate supports PHP 8.5 only.
 #endif
+#if SIZEOF_ZEND_LONG != 8
+#error This binding requires 64-bit PHP integers.
+#endif
 #if DBL_MANT_DIG != 53 || FLT_RADIX != 2
 #error Canonical transport requires IEEE-754 binary64.
 #endif
