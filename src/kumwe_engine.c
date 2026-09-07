@@ -2,6 +2,7 @@
 #include "config.h"
 #endif
 #include "php.h"
+#include "main/php_main.h"
 #include "Zend/zend_exceptions.h"
 #include "Zend/zend_smart_str.h"
 #include "ext/json/php_json.h"
@@ -561,6 +562,10 @@ PHP_METHOD(Kumwe_Engine_Runtime, execute)
 
 PHP_MINIT_FUNCTION(kumwe_engine)
 {
+    if (strcmp(php_version(), KUMWE_BINDING_PHP_VERSION) != 0) {
+        php_error_docref(NULL, E_CORE_WARNING, "The executing PHP patch differs from the verified binding build");
+        return FAILURE;
+    }
     zend_class_entry entry;
     INIT_NS_CLASS_ENTRY(entry, "Kumwe\\Engine\\Exception", "BindingFailure", NULL);
     failure_ce = zend_register_internal_class_ex(&entry, spl_ce_RuntimeException);

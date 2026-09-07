@@ -12,7 +12,7 @@ Decimal batch `execute` requests contain exactly `wire_version: 1`, `profile: "d
 
 ## Candidate build
 
-The tested target is PHP 8.5 NTS, Linux x86_64, source installation. Other PHP versions, ZTS, Windows and other architectures are refused. CMake 3.25+, a C11/C++20 compiler, PHP development headers/phpize and make must already be provisioned.
+The tested target is PHP 8.5 NTS, Linux x86_64, source installation. Other PHP versions, ZTS, Windows and other architectures are refused. Module startup also compares the executing PHP patch with the independently recorded build patch; a different patch refuses before registering classes. CMake 3.25+, a C11/C++20 compiler, PHP development headers/phpize and make must already be provisioned.
 
 ```sh
 php tools/verify-engine.php
