@@ -1,0 +1,8 @@
+* text=auto eol=lf
+/.github export-ignore
+/.gitignore export-ignore
+/.gitattributes export-ignore
+/.libs export-ignore
+/autom4te.cache export-ignore
+/engine-build export-ignore
+/modules export-ignore

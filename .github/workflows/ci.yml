@@ -1,0 +1,67 @@
+name: Native binding candidate
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  binding:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+      - name: Verify committed source and generated API
+        run: |
+          composer validate --strict
+          php tools/generate-arginfo.php --check
+          php tools/verify-binding.php
+          php tools/verify-engine.php
+      - name: Build actual PHP extension
+        run: |
+          phpize
+          ./configure --enable-kumwe_engine
+          make -j2
+      - name: Execute PHPT and corpus parity
+        env:
+          NO_INTERACTION: '1'
+          REPORT_EXIT_STATUS: '1'
+        run: make test TESTS='tests' TEST_PHP_ARGS='-q'
+      - name: Native allocation lifecycle under Valgrind
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y valgrind
+          USE_ZEND_ALLOC=0 valgrind --error-exitcode=97 --leak-check=full --errors-for-leak-kinds=definite php -n -d extension="$PWD/modules/kumwe_engine.so" tools/lifecycle.php
+      - name: Record tested tuple
+        run: php -n -d extension="$PWD/modules/kumwe_engine.so" tools/consumer.php > candidate-tuple.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: binding-evidence
+          path: |
+            candidate-tuple.json
+            tests/*.diff
+            tests/*.out
+            config.log
+  clean-pie:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: pie
+      - name: Extract exact committed source archive
+        run: |
+          mkdir "$RUNNER_TEMP/kumwe-pie-source"
+          git archive HEAD | tar -x -C "$RUNNER_TEMP/kumwe-pie-source"
+      - name: PIE install with networking disabled
+        run: |
+          cd "$RUNNER_TEMP/kumwe-pie-source"
+          sudo unshare --net -- env PATH="$PATH" COMPOSER_DISABLE_NETWORK=1 KUMWE_PIE_PATH="$(command -v pie)" bash tools/offline-install.sh
