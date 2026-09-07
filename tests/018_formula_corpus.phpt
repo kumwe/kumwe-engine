@@ -39,7 +39,7 @@ foreach ($corpus->vectors as $fixture) {
         ['correlation' => $fixture->id, 'input' => $input],
     ])];
     try {
-        $output = $runtime->execute($request);
+        $output = execute_formats($runtime, $request);
     } catch (Kumwe\Engine\Exception\BindingFailure $failure) {
         // Execution errors cross the same ABI as INVALID_INPUT; phase is checked separately.
         if ($expectedPhase !== 'evaluate' || $fixture->expected->refusal !== 'evaluation_refused' || $failure->getCode() !== 1) {
@@ -75,12 +75,12 @@ $request = ['plan_id' => $plan['plan_id'], 'batch' => batch_envelope([document()
 $limited = $request;
 $limited['batch']['limits']['max_instructions'] = 1;
 try {
-    $runtime->execute($limited);
+    execute_formats($runtime, $limited);
     throw new RuntimeException('Formula work budget was ignored.');
 } catch (Kumwe\Engine\Exception\BindingFailure $failure) {
     if ($failure->getCode() !== 6) { throw $failure; }
 }
-if ($runtime->execute($request)['results'][0]['result']['value'] !== 6) {
+if (execute_formats($runtime, $request)['results'][0]['result']['value'] !== 6) {
     throw new RuntimeException('Formula plan changed after budget refusal.');
 }
 echo "formula work budget and plan reuse passed\n";

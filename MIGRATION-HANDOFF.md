@@ -19,3 +19,10 @@ After independently verified publication, extension Phase 2 provisions the exact
 Rollback restores the entire last-known-good image, extension, Engine, Composer lock and configuration tuple. It never selects a PHP implementation or replaces a loaded shared object in place.
 
 The Runtime now provides explicit `release(string $planId): void` to reclaim plan slots and encoded-source bytes during long-lived execution. Computation owns association and garbage-collection cleanup of its portable CompiledProgram objects. The extension rejects foreign/released handles and never evicts a live caller-owned plan. Ordinary and canonical marshalling write bounded transport bytes directly without duplicated PHP trees; semantic algorithms remain entirely native.
+
+The binding advertises `opaque-compiled-results/1` through its own `binding_features` list.
+Compiled callers may select `result_format: "opaque"` and consume original `result_json` plus
+correlation and portable findings without building an unused decoded result. Omission or `"both"`
+retains the original result shape. Current Computation requires this feature before requesting it;
+all compiled owner corpora execute in both formats with identical bytes and refusal codes. The
+independent expected tuple derives the feature list from the committed binding API manifest.

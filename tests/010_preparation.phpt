@@ -18,7 +18,7 @@ foreach ($corpus->fixtures as $fixture) {
     ]);
     // Opaque input preserves the owner's empty object/list distinctions.
     $input = json_encode(['fields' => $fixture->input, 'lines' => $fixture->lines], JSON_THROW_ON_ERROR);
-    $output = $runtime->execute(['plan_id' => $plan['plan_id'], 'batch' => batch_envelope([
+    $output = execute_formats($runtime, ['plan_id' => $plan['plan_id'], 'batch' => batch_envelope([
         ['correlation' => $fixture->id, 'input' => $input],
     ])]);
     $row = $output['results'][0];

@@ -29,7 +29,7 @@ foreach ($corpus->fixtures as $fixture) {
         ['correlation' => $fixture->id, 'input' => $input],
     ])];
     try {
-        $output = $runtime->execute($request);
+        $output = execute_formats($runtime, $request);
     } catch (Kumwe\Engine\Exception\BindingFailure $failure) {
         // ReportUnavailable is the owner's runtime refusal, mapped by the public ABI to INVALID_INPUT.
         if (($fixture->expected->refusal_class ?? null) !== 'Kumwe\\App\\BusinessReporting\\Application\\ReportUnavailable'
@@ -87,12 +87,12 @@ foreach (['max_instructions' => 1, 'max_output_bytes' => 2] as $limit => $value)
     $limited = $request;
     $limited['batch']['limits'][$limit] = $value;
     try {
-        $runtime->execute($limited);
+        execute_formats($runtime, $limited);
         throw new RuntimeException('Report ignored ' . $limit);
     } catch (Kumwe\Engine\Exception\BindingFailure $failure) {
         if ($failure->getCode() !== 6) { throw $failure; }
     }
-    $result = json_decode($runtime->execute($request)['results'][0]['result_json'], false, 512, JSON_THROW_ON_ERROR);
+    $result = json_decode(execute_formats($runtime, $request)['results'][0]['result_json'], false, 512, JSON_THROW_ON_ERROR);
     if (!same_fixture_value($result->rows, $expected)) {
         throw new RuntimeException('Report declaration order, sorting or plan reuse failed.');
     }
@@ -100,7 +100,7 @@ foreach (['max_instructions' => 1, 'max_output_bytes' => 2] as $limit => $value)
 $invalid = $request;
 $invalid['batch']['documents'][0]['input'] = '{"fields":{"rows":[{"n":{"secret":"value"}}]},"lines":{}}';
 try {
-    $runtime->execute($invalid);
+    execute_formats($runtime, $invalid);
     throw new RuntimeException('Structured report cell was accepted.');
 } catch (Kumwe\Engine\Exception\BindingFailure $failure) {
     if ($failure->getCode() !== 1) { throw $failure; }

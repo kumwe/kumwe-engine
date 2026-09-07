@@ -15,7 +15,7 @@ foreach ($corpus->fixtures as $fixture) {
         'corpus_digest' => $digest, 'program' => json_encode(document_fixture_program($fixture), JSON_THROW_ON_ERROR)]);
     $lines = $fixture->owned_lines === [] ? new stdClass() : $fixture->owned_lines;
     $input = json_encode(['fields' => $fixture->normalized_values, 'lines' => $lines], JSON_THROW_ON_ERROR);
-    $output = $runtime->execute(['plan_id' => $plan['plan_id'], 'batch' => batch_envelope([
+    $output = execute_formats($runtime, ['plan_id' => $plan['plan_id'], 'batch' => batch_envelope([
         ['correlation' => $fixture->id, 'input' => $input],
     ])]);
     $row = $output['results'][0];

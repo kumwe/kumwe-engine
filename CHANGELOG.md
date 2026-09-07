@@ -7,7 +7,7 @@
 - NRM-2026-044: add `Runtime::release(string $planId): void` so a long-lived owner can reclaim
   individual plan slots and the exact encoded-source budget. Foreign, malformed and already
   released IDs fail without changing live plans; object destruction releases remaining plans.
-- Marshal admitted arrays and canonical value/key tags directly into bounded JSON bytes,
+- Marshal admitted arrays and canonical value/key tags directly into bounded transport bytes,
   removing copied PHP object/tag trees while keeping algorithms and semantic validation in Engine.
 - Cover slot and byte-budget reuse, released-ID refusal and repeated lifecycle cleanup in PHPT;
   retain all formula, document, report, decimal and canonical owner-corpus acceptance suites.
@@ -17,3 +17,11 @@
 - Replace canonical tagged-JSON expansion and opaque compiled-batch escaping with bounded Engine
   binary frames; retain original public PHP results, exact logical limits and fallback JSON input.
 - Add full framed-batch parity/refusal PHPT and safe NUL-terminated PHP JSON slice decoding.
+- Embed Engine's fused UTF-8/JSON byte accounting and immutable result quote-size reuse;
+  the PHP API and its original logical input/output budgets are unchanged. Performance
+  evidence must identify the exact built module; the counting optimization alone is no
+  basis for a stable release or an acceleration completion claim.
+- Add explicit compiled result_format "opaque" for callers consuming only result_json,
+  avoiding an unused decoded PHP value. Omission or "both" preserves the original API.
+  Advertise the binding-owned capability and replay compiled owner corpora in both modes;
+  retain identical correlation, findings, opaque bytes, logical budgets and refusals.

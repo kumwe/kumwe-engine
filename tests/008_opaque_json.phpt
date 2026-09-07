@@ -13,10 +13,10 @@ catch (Kumwe\Engine\Exception\BindingFailure $e) { echo 'opaque invalid decimal:
 $envelope['program'] = '{"op":"literal","type":"string","value":"1e-9999"}';
 $p = $r->compile($envelope);
 $batch = batch_envelope([['correlation' => 'opaque', 'input' => '{"fields":{},"lines":null}']]);
-$out = $r->execute(['plan_id' => $p['plan_id'], 'batch' => $batch]);
+$out = execute_formats($r, ['plan_id' => $p['plan_id'], 'batch' => $batch]);
 echo $out['results'][0]['result_json'], "\n";
 $batch = batch_envelope([document(lines: ['items' => [[]]])]);
-$out = $r->execute(['plan_id' => $p['plan_id'], 'batch' => $batch]);
+$out = execute_formats($r, ['plan_id' => $p['plan_id'], 'batch' => $batch]);
 echo $out['results'][0]['result']['value'], "\n";
 ?>
 --EXPECT--

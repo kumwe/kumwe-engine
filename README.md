@@ -31,6 +31,15 @@ The nearest semantic Composer package owns its interface adapter. App owns datab
 See [migration handoff](MIGRATION-HANDOFF.md), [memory ownership](docs/memory.md), and [candidate compatibility](resources/compatibility/v1.json). Release and App adoption gates remain open.
 
 Opaque compiled documents use KEB1/KER2 framing internally; canonical PHP values use KEC1 frames.
+
+Compiled `execute` envelopes may select `result_format: "opaque"` to return each row's
+`correlation`, portable `findings` and original `result_json` without creating an unused decoded
+PHP `result`. Omission or explicit `"both"` preserves the original four-key row. The option is a
+strict string enum; canonical and decimal calls do not accept it. Original logical input/output
+budgets apply in both modes. The optimized framing path relies on Engine-owned JSON serialization;
+direct value-tree batches retain the same row shape after the compatibility decoder runs.
+`binding_features` advertises `opaque-compiled-results/1`; current Computation verifies this
+capability before requesting opaque results. It never substitutes a userland execution backend.
 These bounded transports preserve the public arrays, ordered key types, raw bytes, semantic findings
 and logical JSON byte budgets. Direct value-tree batches retain the JSON transport. The C ABI
 contracts and framing belong to the embedded Engine; Zend performs only marshalling and ownership.

@@ -226,6 +226,10 @@ PHP_METHOD(Kumwe_Engine_Runtime, capabilities)
             add_assoc_string(return_value, "extension_version", PHP_KUMWE_ENGINE_VERSION);
             add_assoc_string(return_value, "embedded_engine_commit", KUMWE_EMBEDDED_ENGINE_COMMIT);
             add_assoc_string(return_value, "embedded_source_sha256", KUMWE_EMBEDDED_ENGINE_SHA256);
+            zval features; array_init(&features);
+            add_assoc_zval(return_value, "binding_features", &features);
+            zval *owned_features = zend_hash_str_find(Z_ARRVAL_P(return_value), "binding_features", sizeof("binding_features") - 1);
+            add_next_index_string(owned_features, "opaque-compiled-results/1");
             add_assoc_long(return_value, "binding_max_plans", BINDING_MAX_PLANS);
             add_assoc_long(return_value, "binding_max_bytes", (zend_long)BINDING_MAX_BYTES);
         }
@@ -610,9 +614,21 @@ static zend_result decode_json_frame(zval *result, const char *bytes, size_t siz
     return status;
 }
 
-static zend_result decode_batch_buffer(kumwe_engine_v1_buffer *buffer, zval *result, bool framed)
+static zend_result decode_batch_buffer(kumwe_engine_v1_buffer *buffer, zval *result, bool framed, bool opaque)
 {
-    if (!framed) { return decode_buffer(buffer, result, BINDING_MAX_BYTES); }
+    if (!framed) {
+        if (decode_buffer(buffer, result, BINDING_MAX_BYTES) == FAILURE) { return FAILURE; }
+        if (opaque) {
+            zval *rows = zend_hash_str_find(Z_ARRVAL_P(result), "results", sizeof("results") - 1);
+            if (rows == NULL || Z_TYPE_P(rows) != IS_ARRAY) { goto malformed; }
+            zval *row;
+            ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(rows), row) {
+                if (Z_TYPE_P(row) != IS_ARRAY) { goto malformed; }
+                zend_hash_str_del(Z_ARRVAL_P(row), "result", sizeof("result") - 1);
+            } ZEND_HASH_FOREACH_END();
+        }
+        return SUCCESS;
+    }
     kumwe_engine_v1_view view = {sizeof(kumwe_engine_v1_view), 1, NULL, 0};
     if (kumwe_engine_v1_buffer_view(buffer, &view) != KUMWE_ENGINE_V1_OK || view.size < 8
         || view.data == NULL || view.size > BINDING_MAX_BYTES || memcmp(view.data, "KER2", 4) != 0) { goto malformed; }
@@ -636,9 +652,11 @@ static zend_result decode_batch_buffer(kumwe_engine_v1_buffer *buffer, zval *res
         zval decoded; ZVAL_UNDEF(&decoded);
         if (decode_json_frame(&decoded, findings, findings_size) == FAILURE || Z_TYPE(decoded) != IS_ARRAY) { zval_ptr_dtor(&decoded); goto malformed; }
         add_assoc_zval(owned_row, "findings", &decoded);
-        ZVAL_UNDEF(&decoded);
-        if (decode_json_frame(&decoded, payload, payload_size) == FAILURE || Z_TYPE(decoded) != IS_ARRAY) { zval_ptr_dtor(&decoded); goto malformed; }
-        add_assoc_zval(owned_row, "result", &decoded);
+        if (!opaque) {
+            ZVAL_UNDEF(&decoded);
+            if (decode_json_frame(&decoded, payload, payload_size) == FAILURE || Z_TYPE(decoded) != IS_ARRAY) { zval_ptr_dtor(&decoded); goto malformed; }
+            add_assoc_zval(owned_row, "result", &decoded);
+        }
         add_assoc_stringl(owned_row, "result_json", payload, payload_size);
     }
     if (remaining != 0) { goto malformed; }
@@ -671,12 +689,16 @@ PHP_METHOD(Kumwe_Engine_Runtime, execute)
     zval *identity = zend_hash_str_find(arguments, "plan_id", sizeof("plan_id") - 1);
     zval *batch = zend_hash_str_find(arguments, "batch", sizeof("batch") - 1);
     zval *cancelled = zend_hash_str_find(arguments, "cancelled", sizeof("cancelled") - 1);
+    zval *format = zend_hash_str_find(arguments, "result_format", sizeof("result_format") - 1);
     if (identity == NULL || Z_TYPE_P(identity) != IS_STRING || Z_STRLEN_P(identity) != 32
         || batch == NULL || Z_TYPE_P(batch) != IS_ARRAY
         || (cancelled != NULL && Z_TYPE_P(cancelled) != IS_TRUE && Z_TYPE_P(cancelled) != IS_FALSE)
-        || zend_hash_num_elements(arguments) != (cancelled == NULL ? 2U : 3U)) {
+        || (format != NULL && (Z_TYPE_P(format) != IS_STRING
+            || (!zend_string_equals_literal(Z_STR_P(format), "both") && !zend_string_equals_literal(Z_STR_P(format), "opaque"))))
+        || zend_hash_num_elements(arguments) != 2U + (cancelled != NULL ? 1U : 0U) + (format != NULL ? 1U : 0U)) {
         binding_failure(KUMWE_ENGINE_V1_INVALID_INPUT); RETURN_THROWS();
     }
+    const bool opaque = format != NULL && zend_string_equals_literal(Z_STR_P(format), "opaque");
     runtime_object *object = runtime_from_object(Z_OBJ_P(ZEND_THIS));
     binding_plan *plan = zend_hash_find_ptr(&object->plans, Z_STR_P(identity));
     if (plan == NULL) { binding_failure(KUMWE_ENGINE_V1_INVALID_INPUT); RETURN_THROWS(); }
@@ -699,7 +721,7 @@ PHP_METHOD(Kumwe_Engine_Runtime, execute)
         kumwe_engine_v1_buffer_release(&buffer); binding_failure(status); RETURN_THROWS();
     }
     zend_try {
-        decode_batch_buffer(buffer, return_value, framed);
+        decode_batch_buffer(buffer, return_value, framed, opaque);
     } zend_catch {
         kumwe_engine_v1_buffer_release(&buffer); zend_bailout();
     } zend_end_try();
