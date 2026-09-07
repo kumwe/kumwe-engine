@@ -14,6 +14,11 @@ for ($i = 0; $i < 100; ++$i) {
     }
     try { $runtime->execute(['plan_id' => str_repeat('0', 32), 'batch' => []]); }
     catch (Kumwe\Engine\Exception\BindingFailure) {}
+    $runtime->release($plan['plan_id']);
+    for ($reuse = 0; $reuse < 70; ++$reuse) {
+        $temporary = literal_plan($runtime);
+        $runtime->release($temporary['plan_id']);
+    }
     unset($runtime);
 }
-echo "100 owners with formula and PCRE2 plans compiled, executed and destroyed.\n";
+echo "100 owners with formula and PCRE2 plans and 7000 explicit plan releases completed.\n";

@@ -13,7 +13,8 @@
       "methods": [
         "capabilities(): array",
         "compile(array $envelope): array",
-        "execute(array $envelope): array"
+        "execute(array $envelope): array",
+        "release(string $planId): void"
       ]
     },
     "Kumwe\\Engine\\Exception\\BindingFailure": {

@@ -7,9 +7,13 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_runtime_execute, 0, 1, IS_ARRAY, 0)
     ZEND_ARG_TYPE_INFO(0, envelope, IS_ARRAY, 0)
 ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_runtime_release, 0, 1, IS_VOID, 0)
+    ZEND_ARG_TYPE_INFO(0, planId, IS_STRING, 0)
+ZEND_END_ARG_INFO()
 static const zend_function_entry runtime_methods[] = {
     PHP_ME(Kumwe_Engine_Runtime, capabilities, arginfo_runtime_capabilities, ZEND_ACC_PUBLIC)
     PHP_ME(Kumwe_Engine_Runtime, compile, arginfo_runtime_compile, ZEND_ACC_PUBLIC)
     PHP_ME(Kumwe_Engine_Runtime, execute, arginfo_runtime_execute, ZEND_ACC_PUBLIC)
+    PHP_ME(Kumwe_Engine_Runtime, release, arginfo_runtime_release, ZEND_ACC_PUBLIC)
     PHP_FE_END
 };
