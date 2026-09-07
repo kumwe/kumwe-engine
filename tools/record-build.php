@@ -8,6 +8,7 @@ if (count($argv) !== 11) {
 }
 [, $source, $build, $phpConfig, $cc, $cflags, $cppflags, $ldflags, $cxx, $host, $ld] = $argv;
 $run = static function (array $command): string {
+    if (($command[0] ?? '') === '') { throw new RuntimeException('Configured build command is empty.'); }
     $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
     if (!is_resource($process)) { throw new RuntimeException('Build identity command could not start.'); }
     fclose($pipes[0]);
@@ -87,6 +88,7 @@ $record = ['schema' => 'kumwe-zend-build/v1', 'php_version' => PHP_VERSION, 'php
 $bytes = json_encode($record, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
 file_put_contents($build . '/build-identity.json', $bytes);
 $header = "#ifndef KUMWE_ENGINE_BUILD_CONFIG_H\n#define KUMWE_ENGINE_BUILD_CONFIG_H\n"
+    . '#define KUMWE_BINDING_PHP_VERSION ' . json_encode(PHP_VERSION, JSON_THROW_ON_ERROR) . "\n"
     . '#define KUMWE_BINDING_BUILD_JSON ' . json_encode($bytes, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n"
     . '#define KUMWE_BINDING_BUILD_SHA256 "' . hash('sha256', $bytes) . "\"\n"
     . '#define KUMWE_BINDING_DECIMAL_CORPUS "' . hash_file('sha256', $source . '/vendor/engine/corpus/decimal/decimal-v1.tsv')

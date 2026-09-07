@@ -35,6 +35,8 @@ jobs:
           NO_INTERACTION: '1'
           REPORT_EXIT_STATUS: '1'
         run: make test TESTS='tests' TEST_PHP_ARGS='-q'
+      - name: Refuse a mismatched actual PHP patch at module startup
+        run: bash tools/test-php-patch-guard.sh
       - name: Native allocation lifecycle under Valgrind
         run: |
           sudo apt-get update -qq
