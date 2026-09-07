@@ -3,7 +3,28 @@
   "description": "Bounded Zend binding to an exact embedded Kumwe Engine candidate.",
   "type": "php-ext",
   "license": "Apache-2.0",
-  "require": {"php": "~8.5.0", "php-64bit": "~8.5.0", "ext-json": "*", "ext-random": "*", "ext-spl": "*"},
-  "php-ext": {"extension-name": "kumwe_engine", "support-zts": false, "support-nts": true, "os-families": ["linux"], "build-path": "."},
-  "scripts": {"check": ["composer validate --strict", "php tools/verify-binding.php", "php tools/verify-engine.php"]}
+  "require": {
+    "php": "~8.5.0",
+    "php-64bit": "~8.5.0",
+    "ext-json": "*",
+    "ext-random": "*",
+    "ext-spl": "*"
+  },
+  "php-ext": {
+    "extension-name": "kumwe_engine",
+    "support-zts": false,
+    "support-nts": true,
+    "os-families": [
+      "linux"
+    ],
+    "build-path": "."
+  },
+  "scripts": {
+    "check": [
+      "composer validate --strict",
+      "php tools/generate-arginfo.php --check",
+      "php tools/verify-binding.php",
+      "php tools/verify-engine.php"
+    ]
+  }
 }
