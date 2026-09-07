@@ -1,7 +1,7 @@
 PHP_ARG_ENABLE([kumwe_engine], [whether to enable the Kumwe Engine binding],
   [AS_HELP_STRING([--enable-kumwe_engine], [Enable the self-contained Kumwe Engine extension])], [yes])
 if test "$PHP_KUMWE_ENGINE" != "no"; then
-  AC_REQUIRE([AC_CANONICAL_HOST])
+  AC_CANONICAL_HOST
   case "$host_os:$host_cpu" in
     linux*:x86_64) ;;
     *) AC_MSG_ERROR([This candidate supports Linux x86_64 only]) ;;
