@@ -291,8 +291,15 @@ jobs:
             install --working-dir=tests/benchmark --no-dev --no-interaction --prefer-dist --no-plugins --no-scripts
       - name: Measure complete calls, exact parity, allocations and synthetic saturation
         run: |
+          # The 4096-document oracle exceeds the distro's 128MiB CLI default.
+          # Apply the same finite benchmark budget to both measured backends.
+          cat > "$RUNNER_TEMP/benchmark-php" <<'SH'
+          #!/usr/bin/env bash
+          exec "$RUNNER_TEMP/diagnostic-runtime/bin/php" -d memory_limit=1G -d display_errors=stderr "$@"
+          SH
+          chmod +x "$RUNNER_TEMP/benchmark-php"
           python3 benchmark-sources/engine/benchmarks/e2e/run.py \
-            --php "$RUNNER_TEMP/diagnostic-runtime/bin/php" \
+            --php "$RUNNER_TEMP/benchmark-php" \
             --extension "$RUNNER_TEMP/binding-evidence/modules/kumwe_engine.so" \
             --engine "$PWD/benchmark-sources/engine" \
             --app "$PWD/benchmark-sources/app" --sdk "$PWD/benchmark-sources/sdk" \
