@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Replay the full Engine-owned whole-call benchmark against each tested candidate
+  module and its verified diagnostic PHP host. Retain exact source identities,
+  every parity/refusal result, slower profiles, allocations and saturation evidence.
+  Freeze the unchanged PHP oracle and its dependencies outside source/PIE exports.
+
 - Build and capture the diagnostic PHP host from actual Ubuntu packages so every
   captured executable, extension and ELF dependency retains strict package attribution.
   Add package-origin refusal regressions; keep diagnostic byte/closure verification

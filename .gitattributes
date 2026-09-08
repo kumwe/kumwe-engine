@@ -6,3 +6,4 @@
 /autom4te.cache export-ignore
 /engine-build export-ignore
 /modules export-ignore
+/tests/benchmark export-ignore

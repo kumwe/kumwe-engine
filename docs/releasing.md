@@ -91,3 +91,23 @@ merged-/usr path aliases and refusal of unowned builder binaries, mismatched pat
 diversion-only responses and malformed owners. The existing diagnostic self-test
 and hosted capture/relocation/module-tuple checks remain mandatory. This fixture
 is diagnostic-only and does not provide stable release or artifact attestation.
+
+## Whole-boundary candidate measurements
+
+The dependent `whole-boundary-benchmarks` CI job downloads this run's verified PHP
+fixture and tested module, checks the exact consumer tuple again, and replays the
+Engine-owned comparison harness. It checks out the exact embedded Engine commit
+and verifies its archive and every source digest against the binding lock. The
+unchanged PHP oracle is App `24ecf956423c18933e824b43cea1bfb9127a79a9` with SDK
+`d0484b8733eaa57d076f567ffa5e997b9564b5fa`; its isolated dependencies are locked under
+`tests/benchmark` and excluded from source/PIE distribution. No App change or
+integration is made.
+
+The external `whole-boundary-performance` artifact retains all six workload
+families at 1/32/256/4096 inputs, 30 measured samples, warm/cold plans, valid and
+hostile parity, allocation/RSS probes and 1/2/4/8-process synthetic saturation.
+It records the actual module, host, source and corpus identities, including
+slower native workloads. Correctness/refusal mismatches fail CI; measurements
+never assert an automatic speedup or production capacity result. Stable native
+qualification still requires review of the exact candidate's representative
+whole-call results and the independently verified release prerequisites.

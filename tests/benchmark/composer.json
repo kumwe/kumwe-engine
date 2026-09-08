@@ -1,0 +1,13 @@
+{
+  "name": "kumwe/native-readiness-oracle",
+  "description": "Isolated test-only dependencies matching the unchanged App oracle",
+  "type": "project",
+  "require": {
+    "php": "~8.5.0",
+    "brick/math": "0.18.0",
+    "kumwe/conversion": "0.1.2",
+    "ramsey/collection": "2.1.1",
+    "ramsey/uuid": "4.9.3"
+  },
+  "config": {"allow-plugins": false, "sort-packages": true}
+}
