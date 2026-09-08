@@ -2,7 +2,7 @@
   "schema": "kumwe-zend-compatibility/v1",
   "state": "candidate",
   "release_verified": false,
-  "version": "0.0.0-dev",
+  "version": "1.0.0",
   "engine_lock": "resources/engine-lock.json",
   "php": "8.5",
   "thread_model": "NTS",

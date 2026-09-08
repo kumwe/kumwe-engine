@@ -20,7 +20,7 @@
 #include <string.h>
 
 #if PHP_VERSION_ID < 80500 || PHP_VERSION_ID >= 80600
-#error This candidate supports PHP 8.5 only.
+#error This extension supports PHP 8.5 only.
 #endif
 #if SIZEOF_ZEND_LONG != 8
 #error This binding requires 64-bit PHP integers.
@@ -29,7 +29,7 @@
 #error Canonical transport requires IEEE-754 binary64.
 #endif
 #ifdef ZTS
-#error ZTS is not claimed by this candidate.
+#error This extension supports NTS only.
 #endif
 
 #define BINDING_MAX_BYTES ((size_t)16777216)
@@ -757,7 +757,7 @@ PHP_MINFO_FUNCTION(kumwe_engine)
     php_info_print_table_start();
     php_info_print_table_row(2, "kumwe_engine", PHP_KUMWE_ENGINE_VERSION);
     php_info_print_table_row(2, "embedded Engine commit", KUMWE_EMBEDDED_ENGINE_COMMIT);
-    php_info_print_table_row(2, "release state", "candidate; not release-verified");
+    php_info_print_table_row(2, "release verification", "requires external source and build attestations");
     php_info_print_table_end();
 }
 

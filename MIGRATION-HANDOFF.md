@@ -13,10 +13,10 @@ source:
     capability_index_sha256: null
   semantic_inputs:
   - owner: kumwe/engine
-    version_or_commit: 0.0.0-dev at 72fd09632e740f0bfd1bb09cc87749110ca21b90
+    version_or_commit: 1.0.0 at 73d11f2f71a6bd2bb903c7caafd94e0f9950ec0c
     manifest_or_corpus: resources/engine-lock.json; exact unprefixed git archive tar, embedded manifests and complete
       per-file closure
-    sha256: 0bad2590524f8d2328e6b5c21284fb3ce815b8332e1f55a8f6137cba77d155dc
+    sha256: c350db3ce8fed53b28ccaf835dc2474050a919e582765871f70a0caf45b12001
   examined_dependencies:
   - Engine C ABI, complete locked source, all semantic corpora and capability manifests; no semantic implementation
     is owned by this binding.
@@ -24,13 +24,13 @@ source:
   - Computation portable contracts and native adapter are separate Composer packages; no Composer interfaces or
     semantic classes are registered by this extension.
   active_related_pull_requests:
-  - https://github.com/kumwe/engine/pull/7
+  - https://github.com/kumwe/engine/pull/8
 target:
   repository: https://github.com/kumwe/kumwe-engine
   artifact_identity: PIE kumwe/kumwe-engine; module kumwe_engine; ext-kumwe_engine
   canonical_namespace_or_abi: Kumwe\Engine\
-  branch: codex/extraction-readiness-20260907
-  pull_request: https://github.com/kumwe/kumwe-engine/pull/3
+  branch: codex/stable-native-readiness-20260908
+  pull_request: https://github.com/kumwe/kumwe-engine/pull/4
 ownership:
   responsibility: Thin bounded Zend marshalling, Engine ABI invocation, source/tuple handshake and request-local
     native ownership.
@@ -46,9 +46,9 @@ ownership:
   - path: resources/api/v1.json
     sha256: 9b81eac7ec67e1bd084538d142d1b85f85c299e23597dccb7de538ee1d660d18
   - path: resources/compatibility/v1.json
-    sha256: c58240fa18f876ac2719c46996e2c8e496e29695e64362d9386962cfbfeee210
+    sha256: 6155c84fcf0b760e16b0b166c3d4ef1bafc7e05da18a9aefd48bed6b39c67371
   - path: resources/engine-lock.json
-    sha256: ea61dcaf2c339ea16d6e77341873902ca55aea5499965e0457e95528764903cc
+    sha256: c5faaabbeff7cb42e5682ce6bb3989d8fcf8c33d12fbaa77b31f1ef4118299af
   - path: stubs/kumwe_engine.stub.php
     sha256: 60759986320f6b6aa393452c9d41bb55c013c52d633124d14f9c260e07b8d976
   - path: src/kumwe_engine_arginfo.h
@@ -79,9 +79,9 @@ php_extension:
   - src/kumwe_engine_arginfo.h
   - tools/generate-arginfo.php --check; stubs are never autoloaded.
   embedded_engine:
-    version: 0.0.0-dev
-    source_commit: 72fd09632e740f0bfd1bb09cc87749110ca21b90
-    source_archive_sha256: 0bad2590524f8d2328e6b5c21284fb3ce815b8332e1f55a8f6137cba77d155dc
+    version: 1.0.0
+    source_commit: 73d11f2f71a6bd2bb903c7caafd94e0f9950ec0c
+    source_archive_sha256: c350db3ce8fed53b28ccaf835dc2474050a919e582765871f70a0caf45b12001
     abi_major: 1
     capabilities:
     - decimal-batch-draft/1
@@ -101,9 +101,7 @@ php_extension:
     - 84d21b12e7a2bfd752356d9a6e664bcb332e209d19017e7634e7485a4fa4e250
     - 8a1c1dce8686d09ca5e53d7b1971620e887237c6019a1189549bd873ec6a87da
     - 975116dc897a0bfdee4a08f9065eb10ccfec06a32f4eb93a48015b08af408c01
-    - b7c340b7d8df32bacd2b16a8f575a43b99052642b2c38cd7896370acbc947350
     - dbc005bd77fdd764c873bdde57261bc6cb79a8463164fb83e0da8cbe7603161c
-    - e91c9b03f4d61942689a3d675d29cd1f386d9a9ac296a572b16e954196947e7a
     - fce91bfe3c9614ec3862b50c0defc10a9b69ed021671f8382d774d8cb0a20668
   handle_lifecycle:
   - Runtime owns at most 64 immutable plans and 16 MiB encoded source; opaque random plan IDs belong only to their
@@ -240,8 +238,9 @@ decisions:
 - Qualify only PHP 8.5 NTS Linux x86_64; other tuples require new passing evidence.
 - Publish honest measured whole-boundary results, including slower workloads; App workload acceptance is later.
 blockers:
-- Current exact embedded Engine remains a development source; final stable embedding and independent Engine release
-  verification are pending.
+- The embedded Engine retains Reporting 0.1.3 as unverified because its clean consumer cannot resolve the missing
+  Access Control package registration. Its other semantic owners and portable Computation baseline have actual independent
+  receipts; no stable Engine release is claimed.
 - Final-head native/binding qualification and external candidate/release records remain mandatory before stable
   publication.
 ---

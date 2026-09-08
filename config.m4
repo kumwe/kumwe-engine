@@ -4,7 +4,7 @@ if test "$PHP_KUMWE_ENGINE" != "no"; then
   AC_CANONICAL_HOST
   case "$host_os:$host_cpu" in
     linux*:x86_64) ;;
-    *) AC_MSG_ERROR([This candidate supports Linux x86_64 only]) ;;
+    *) AC_MSG_ERROR([This extension supports Linux x86_64 only]) ;;
   esac
   PHP_REQUIRE_CXX()
   AC_PATH_PROG([CMAKE], [cmake], [no])
