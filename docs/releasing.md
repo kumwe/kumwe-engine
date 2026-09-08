@@ -111,3 +111,27 @@ slower native workloads. Correctness/refusal mismatches fail CI; measurements
 never assert an automatic speedup or production capacity result. Stable native
 qualification still requires review of the exact candidate's representative
 whole-call results and the independently verified release prerequisites.
+
+Both benchmark workers use the same finite 1GiB PHP memory budget so the widest
+4096-document oracle can complete its final JSON serialization. Native execution
+limits remain part of the measured and tested contract. PHP fatals are retained
+in the benchmark artifact's worker stderr logs.
+
+## Immutable source publication
+
+`Native source release` follows a successful `Native binding candidate` run on
+the exact current default-branch commit. A dispatch may name that successful run.
+`tools/release-native.py` requires every source, binding, sanitizer, offline PIE
+and whole-boundary lane to pass and reruns the source gate with `--require-stable`.
+It refuses candidate identities, stale or skipped CI, and unverified Engine inputs.
+
+GitHub OIDC signs all five source evidence files. The publisher verifies their
+repository, workflow, default-branch ref, exact commit and hosted build identity
+before creating an immutable version tag and draft. Retries compare existing
+assets without overwriting them, upload missing files, verify all six final assets
+and recheck the branch before publication. `build-provenance.sigstore.json` is the
+sixth asset. `python3 tools/release-native-test.py` tests refusal and retry cases.
+
+Source provenance does not certify an unbuilt module. The final binary's complete
+PHP/Zend/compiler/Engine tuple and independent published-release attestation remain
+separate requirements; the publisher never invents that verification.
