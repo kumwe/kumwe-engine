@@ -1,6 +1,6 @@
 # Kumwe Engine PHP binding
 
-`kumwe/kumwe-engine` is the PIE source package for module `kumwe_engine` and Composer platform requirement `ext-kumwe_engine`. This branch is an **unreleased candidate cross-build**, NRM-2026-043. It embeds one exact committed Engine source snapshot; it does not claim an immutable, externally verified Engine release.
+`kumwe/kumwe-engine` is the PIE source package for module `kumwe_engine` and Composer platform requirement `ext-kumwe_engine`. The proposed 1.0.0 source is an **unreleased candidate cross-build**, NRM-2026-043. It embeds one exact committed Engine source snapshot; it does not claim an immutable, externally verified Engine release.
 
 The actual extension registers `Kumwe\Engine\Runtime` and `Kumwe\Engine\Exception\BindingFailure`. Its methods are `capabilities(): array`, `compile(array $envelope): array`, `execute(array $envelope): array`, and `release(string $planId): void`. Stubs are documentation and are never autoloaded.
 

@@ -55,7 +55,7 @@ $firstLine = static fn (string $value): string => explode("\n", $value)[0];
 $versionOf = static fn (string $command): string => $firstLine($run([...preg_split('/\s+/', trim($command)), '--version']));
 $libc = $run(['getconf', 'GNU_LIBC_VERSION']);
 if (!preg_match('/^glibc [0-9]+\.[0-9]+$/D', $libc)) {
-    throw new RuntimeException('This source candidate requires a verified glibc build tuple.');
+    throw new RuntimeException('This source distribution requires a verified glibc build tuple.');
 }
 $configure = $run([$phpConfig, '--configure-options']);
 $extensionFlags = ['cflags' => $cflags, 'cppflags' => $cppflags, 'ldflags' => $ldflags,

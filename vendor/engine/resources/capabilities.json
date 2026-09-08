@@ -1,8 +1,8 @@
 {
   "engine": "kumwe/engine",
-  "version": "0.0.0-dev",
+  "version": "1.0.0",
   "abi_major": 1,
-  "abi_status": "unstable-development",
+  "abi_status": "frozen",
   "capabilities": [
     "decimal-batch-draft/1",
     "formula-draft/1",
@@ -12,15 +12,15 @@
     "kumwe-canonical-json/generic-v1"
   ],
   "semantic_owner": "kumwe/conversion",
-  "semantic_source": "e95d5633722929e77b73005f8c44cfe4d99ac8c3",
+  "semantic_source": "b291f3a31314644fd88150dc9a9e911fe0617fe7",
   "semantic_release_verified": false,
   "completion_claim": false,
   "corpus_sha256": "635db251898707828e24f12b1abb672273552f5f633186a725cc9f50ac08140c",
   "computation": {
     "wire_version": 1,
-    "engine_version": "0.0.0",
+    "engine_version": "1.0.0",
     "abi_major": 1,
-    "api_version": "0.0.0",
+    "api_version": "1.0.0",
     "build_digest": "@ENGINE_BUILD_DIGEST@",
     "features": [
       {

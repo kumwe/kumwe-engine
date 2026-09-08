@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Prepare the proposed 1.0.0 binding against frozen Engine ABI 1 without changing
+  its PHP methods, framing, ownership or corpus semantics. Preserve candidate
+  publication barriers until the actual immutable Engine release is verified.
+- Bind all qualification checkouts to the exact source head, complete the v2
+  extension handoff, and pin PIE 1.4.10 to its official PHAR SHA256 while retaining
+  the actual network-isolated install/build tuple as external evidence.
+
 - Replay the full Engine-owned whole-call benchmark against each tested candidate
   module and its verified diagnostic PHP host. Retain exact source identities,
   every parity/refusal result, slower profiles, allocations and saturation evidence.

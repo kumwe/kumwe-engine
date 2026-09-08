@@ -52,12 +52,17 @@ adapter candidate. The exact baseline version/tag/commit, archive/API/capability
 SHA256s, released runtime requirements without a native dependency, absence of native
 bindings, and external attestation reference must be recorded in the embedded contract
 matrix as `release-verified`. Missing or unresolved facts refuse stable preparation.
-The current published Computation `v0.2.0`/`v0.2.1` packages and `0.3.0` adapter candidate
-require the native extension and cannot supply that baseline. Re-embedding a reviewed
-candidate does not establish a missing portable release. The source record and unsigned
-provenance preserve this prerequisite, including null/unresolved facts.
+Portable Computation `v0.1.1` has been published and independently verified separately;
+its corrected immutable receipt is recorded by the embedded Engine. The published native `v0.2.0`/`v0.2.1`
+packages and later adapter candidates cannot supply that portable baseline. Re-embedding
+a reviewed candidate cannot replace missing independent verification. The source record
+and unsigned provenance preserve this prerequisite, including null/unresolved facts.
 Candidate CI verifies packaging without that option. A stable-source check does not
 independently verify an external release attestation or grant publication authority.
+
+Reporting `v0.1.3` remains an unverified Engine prerequisite because its clean original-archive
+consumer cannot resolve the unregistered Access Control package. Its source/corpus identity
+is recorded honestly; a missing external receipt cannot be replaced by a local declaration.
 
 The stable binding stage begins only after the immutable Engine release is independently
 verified. Re-embed that exact unmodified release, update its lock and reviewed compatibility

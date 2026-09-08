@@ -1,8 +1,8 @@
 # Release and candidate gates
 
 All five native kernels are implemented and have owner-corpus replay, bounded ABI execution,
-consumer builds and memory/security CI. `0.0.0-dev` identifies an implementation candidate;
-ABI 1 is not frozen and no native release has been published. Implementation completion does
+consumer builds and memory/security CI. `1.0.0` is the proposed first release;
+ABI 1 is frozen and no publication is inferred from that source version. Implementation completion does
 not establish release verification or App acceleration.
 
 `resources/contracts.json` records exact published semantic-owner tags, commits and corpus paths.
@@ -11,22 +11,26 @@ remain a separate requirement: publication and a matching hash alone do not esta
 owner release passed every programme acceptance gate. Updates must retain an exact coordinate;
 never use a moving branch, `latest`, or an unconstrained range for embedded native sources.
 
-The separate Computation Phase 1A prerequisite is currently unresolved. The inspected
-published `v0.2.0` and `v0.2.1` packages require `ext-kumwe_engine: 0.0.0-dev`; the
-`0.3.0` adapter candidate also has a native requirement. None establishes the required
-portable-only baseline. Untagged portable source can inform reconstruction, but cannot
-supply an immutable release or its external verification. `resources/contracts.json`
-records this missing baseline explicitly, with unknown release facts left null.
-A portable contract-baseline release must be published and independently verified
-before the first stable Engine release. The later Computation adapter successor waits
-for the verified Engine and extension releases; candidate cross-builds do not close
-that ordering requirement.
+The current pending input is Reporting `v0.1.3`: its published source and unchanged
+materialization corpus are recorded, but its original-archive clean consumer cannot resolve
+the unregistered Access Control package. Its external attestation remains null, the report
+module remains unverified, and stable-source preparation refuses publication. Registering
+that dependency must be followed by actual independent verification before these flags change.
 
-The remaining release gates are the independently verified semantic release barrier, accepted
-ABI compatibility/freeze, a final supported-platform run, representative whole-boundary performance
-acceptance, and signed source/artifact provenance. The retained benchmark evidence includes slower
+The separate Computation Phase 1A prerequisite uses the published portable-only
+`v0.1.1` release at `fc9d049f8b675c8e19fd1672d49b5e206c9ad52a`. Its actual source archive,
+API, capability, portable corpus and external attestation identities are recorded in
+`resources/contracts.json`. Only the schema-valid durable independent receipt linked by that
+matrix establishes admission. It must cover the original archive, complete canonical schemas,
+package gates and a fresh offline authoritative consumer with no native extension or binding classes.
+Earlier malformed or superseded receipts cannot close the prerequisite.
+The later Computation native adapter successor still waits for verified Engine and extension
+releases; its publication and App adoption are separate steps.
+
+The release gates include the independently verified semantic release barrier, the frozen ABI compatibility fixture, a final supported-platform run, published representative whole-boundary performance
+evidence, and signed source/artifact provenance. The retained benchmark evidence includes slower
 native document, preparation and canonical workloads; a faster inner kernel cannot close that gap.
-Repeat the complete PHP/Zend comparison on the final artifact after optimization. No App cutover
+Repeat the complete PHP/Zend comparison on the final artifact and retain all results. No App cutover
 or capacity claim follows from passing the native test suite.
 
 An independent candidate cross-build must consume the exact Engine PR-head archive in
@@ -82,7 +86,7 @@ the source tree nor its archive contains its own final identity. The tool refuse
 tracked edits, unsafe archive paths, links, caches, credential-like files and PHP oracles.
 
 `--require-stable` is an additional source-state check for the stable release stage.
-It refuses the current development version, unfrozen ABI, draft contract matrix and
+It refuses development versions, unfrozen ABIs, draft contract matrices and
 unverified semantic releases, and an absent or incomplete portable Computation baseline.
 The baseline record must have `state: release-verified`, the exact `kumwe/computation`
 version/tag/commit and source archive SHA256, public API and capability manifest SHA256s,
@@ -100,10 +104,65 @@ This option does not verify signatures, approve ABI freeze or replace the indepe
 candidate/release attestations. Those are review decisions and evidence produced by
 the existing programme release-verification process.
 
-A stable release publisher must use the verified source bundle from the exact approved
-commit and existing immutable tag. It must retain the final supported-platform and
-whole-boundary benchmark evidence, sign/verifiably attest the source assembly and any
-compiled outputs with their actual toolchain/build tuple, and provide the external
-candidate and release verification records. A source SPDX inventory does not describe
-an unbuilt binary. No publishing workflow runs for a candidate, and this tooling never
-turns an unsigned source statement into a release-verification claim.
+## Immutable source publication
+
+`Native source release` runs after successful `Native quality` on the exact current
+default-branch commit, or through an explicit dispatch naming that successful run.
+`tools/release-native.py` checks every required Linux/macOS/compiler, sanitizer and
+archive lane, reruns the stable source gate, and refuses skipped or stale evidence.
+The workflow signs all five source evidence files with GitHub OIDC and verifies the
+repository, workflow, default-branch ref, exact commit and hosted build identity.
+Only then may it create the version tag and draft release. Existing tags and assets
+cannot be moved or overwritten; a retry verifies identical existing bytes before
+uploading missing files. Publication rechecks the final assets and current branch.
+`python3 tools/release-native-test.py` covers these refusal and interrupted-retry paths.
+
+The sixth release asset, `build-provenance.sigstore.json`, authenticates source assembly.
+This source-only publisher does not describe an unbuilt binary or produce an independent
+release-verification claim. The external candidate cross-build, final supported-platform
+and whole-boundary evidence, and separate verifier's published-release attestation remain
+required. A candidate fails the stable source gate and cannot publish.
+
+## Mandatory external candidate reference
+
+A merged source version and successful Engine-only CI cannot authorize a new native
+release. Before creating any new tag or uploading release assets, the publisher
+requires an independently prepared, passing `ENGINE-CANDIDATE-ATTESTATION.yaml` in
+immutable SDK `evidence/` storage. The exact merged Engine pull request body must
+contain one strict machine block:
+
+```text
+<!-- kumwe-engine-candidate/v1
+{"uri":"https://raw.githubusercontent.com/kumwe/extension-sdk/EXACT_40_HEX_COMMIT/evidence/native/ENGINE-CANDIDATE-ATTESTATION.yaml","sha256":"EXACT_YAML_SHA256"}
+-->
+```
+
+The capitals above are documentation placeholders, never accepted gate values.
+Optional workflow-dispatch inputs may supply the same exact URI and digest instead.
+The normal `workflow_run` path reads only a genuinely merged Engine pull request
+whose merge commit equals the currently qualified default-branch commit. A missing,
+ambiguous, mutable or mismatched reference fails before publication; a maintainer
+can attach the reviewed record and rerun the failed publisher without changing
+source or creating a digest cycle.
+
+`tools/release-validation/candidate-gate.mjs` uses the full authoritative candidate
+schema and verifies the original candidate commit, Git tree, raw archive and
+handoff digest. Its tree must equal the merged source tree while the fresh main
+quality run independently passes. The record is never relabeled as an attestation
+of the merge commit. The exact binding candidate must embed that original archive;
+its five source/binding/sanitizer/offline-PIE/whole-boundary jobs must all succeed,
+and its referenced artifact must belong to that actual source run. All recorded
+semantic API, capability, service and corpus inputs are covered by the record.
+
+Install and test the exact release-validator dependencies from the repository root:
+
+```sh
+npm --prefix tools/release-validation ci --ignore-scripts --no-audit
+node --test tools/release-validation/candidate-gate.test.mjs
+```
+
+These are publication tools only; CMake and installed consumers need no npm
+packages or network. The publisher generates release notes from the exact source,
+including dependency/corpus identities, capabilities, limits, changes and security
+policy links. The independently verified published Engine still has to be
+re-embedded and fully rebuilt by the stable binding stage.
