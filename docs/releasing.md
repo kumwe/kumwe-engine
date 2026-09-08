@@ -73,3 +73,21 @@ release-verification record outside the tested source trees. Verify the publishe
 archive, complete handshake, manifests and signed provenance in a separate verification
 session before App provisioning or Computation runtime adoption. No source-tool command
 creates those attestations, freezes an ABI or performs App integration.
+
+## Diagnostic PHP host provenance
+
+The relocatable diagnostic fixture requires real installed-package attribution for
+its PHP executable, shared extensions, loader and ELF dependencies. The pinned
+`setup-php` action's PHP 8.5 binaries can come from an extracted php-builder cache
+and therefore cannot supply a `dpkg-query` ownership record. The binding CI lane
+explicitly installs/reinstalls the Ubuntu PHP 8.5 CLI, development and extension
+packages before compilation, then verifies the CLI/header version agreement.
+The captured runtime is consequently the same package-backed host that built and
+tested the module. Unknown origins continue to fail closed; assigning a guessed
+package name to cached bytes would not establish package provenance.
+
+`python3 tools/test-diagnostic-attribution.py` covers package/multiarch ownership,
+merged-/usr path aliases and refusal of unowned builder binaries, mismatched paths,
+diversion-only responses and malformed owners. The existing diagnostic self-test
+and hosted capture/relocation/module-tuple checks remain mandatory. This fixture
+is diagnostic-only and does not provide stable release or artifact attestation.

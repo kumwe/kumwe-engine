@@ -35,6 +35,24 @@ jobs:
           coverage: none
           extensions: ctype, tokenizer, phar, fileinfo, iconv, mbstring, intl, curl, dom, simplexml, xml, xmlreader, xmlwriter, zip, pdo, sodium
           tools: composer:v2
+      - name: Install package-attributable PHP diagnostic host
+        run: |
+          # setup-php uses extracted php-builder binaries for PHP 8.5. They do
+          # not have dpkg ownership, so install the actual distro packages
+          # before compiling the binding against this captured runtime.
+          sudo add-apt-repository --yes ppa:ondrej/php
+          sudo apt-get update -qq
+          sudo apt-get install --yes --reinstall \
+            php8.5-cli php8.5-common php8.5-dev php8.5-mbstring \
+            php8.5-intl php8.5-curl php8.5-xml php8.5-zip
+          sudo update-alternatives --set php /usr/bin/php8.5
+          sudo update-alternatives --set phpize /usr/bin/phpize8.5
+          sudo update-alternatives --set php-config /usr/bin/php-config8.5
+          dpkg-query --search /usr/bin/php8.5
+          php -n -v
+          test "$(php -n -r 'echo PHP_VERSION;')" = "$(php-config --version)"
+      - name: Verify diagnostic attribution and refusal regression tests
+        run: python3 tools/test-diagnostic-attribution.py
       - name: Verify committed source and generated API
         run: |
           composer validate --strict

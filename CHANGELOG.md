@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Build and capture the diagnostic PHP host from actual Ubuntu packages so every
+  captured executable, extension and ELF dependency retains strict package attribution.
+  Add package-origin refusal regressions; keep diagnostic byte/closure verification
+  and the exact relocated consumer tuple gate. Roadmap impact: None (CI provenance fix).
+
 - NRM-2026-043: implement the candidate Zend Runtime and BindingFailure, with bounded native
   compile/execute/cancellation, typed canonical transport and exact source/build identity.
 - NRM-2026-044: add `Runtime::release(string $planId): void` so a long-lived owner can reclaim
