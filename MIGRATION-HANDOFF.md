@@ -1,16 +1,286 @@
-# Candidate Zend cross-build handoff
+---
+schema: kumwe-migration-handoff/v2
+artifact_kind: php_extension
+migration_id: KUMWE-MIG-2026-043
+change_set: KUMWE-CS-2026-043
+state: draft_pr_open
+source:
+  app:
+    repository: https://github.com/kumwe/app
+    baseline_commit: null
+    examined_paths: []
+    old_namespace_roots: []
+    capability_index_sha256: null
+  semantic_inputs:
+  - owner: kumwe/engine
+    version_or_commit: 0.0.0-dev at 72fd09632e740f0bfd1bb09cc87749110ca21b90
+    manifest_or_corpus: resources/engine-lock.json; exact unprefixed git archive tar, embedded manifests and complete
+      per-file closure
+    sha256: 0bad2590524f8d2328e6b5c21284fb3ce815b8332e1f55a8f6137cba77d155dc
+  examined_dependencies:
+  - Engine C ABI, complete locked source, all semantic corpora and capability manifests; no semantic implementation
+    is owned by this binding.
+  - PHP 8.5 Zend API and phpize/php-config build identity; PIE 1.4.10 source installer.
+  - Computation portable contracts and native adapter are separate Composer packages; no Composer interfaces or
+    semantic classes are registered by this extension.
+  active_related_pull_requests:
+  - https://github.com/kumwe/engine/pull/7
+target:
+  repository: https://github.com/kumwe/kumwe-engine
+  artifact_identity: PIE kumwe/kumwe-engine; module kumwe_engine; ext-kumwe_engine
+  canonical_namespace_or_abi: Kumwe\Engine\
+  branch: codex/extraction-readiness-20260907
+  pull_request: https://github.com/kumwe/kumwe-engine/pull/3
+ownership:
+  responsibility: Thin bounded Zend marshalling, Engine ABI invocation, source/tuple handshake and request-local
+    native ownership.
+  non_responsibilities:
+  - Business semantics, PHP fallback, Composer semantic interfaces and runtime package installation.
+  - Database, authorization, transactions, HTTP, reference resolution, App provisioning and business-runtime cutover.
+  allowed_dependency_ceiling:
+  - PHP 8.5 Zend API and its declared built-in JSON/random/SPL modules.
+  - Exactly embedded self-contained Engine source with its static PCRE2/Unicode closure and C/C++ system runtimes.
+  implementation_owner: kumwe/kumwe-engine
+  next_consumer: kumwe/computation
+  public_manifests:
+  - path: resources/api/v1.json
+    sha256: 9b81eac7ec67e1bd084538d142d1b85f85c299e23597dccb7de538ee1d660d18
+  - path: resources/compatibility/v1.json
+    sha256: c58240fa18f876ac2719c46996e2c8e496e29695e64362d9386962cfbfeee210
+  - path: resources/engine-lock.json
+    sha256: ea61dcaf2c339ea16d6e77341873902ca55aea5499965e0457e95528764903cc
+  - path: stubs/kumwe_engine.stub.php
+    sha256: 60759986320f6b6aa393452c9d41bb55c013c52d633124d14f9c260e07b8d976
+  - path: src/kumwe_engine_arginfo.h
+    sha256: 6b1ab80b944430f786e510e38f98f809efec80097be6e156de0afc63c9861c75
+  intentionally_excluded:
+  - No App code, configuration, dependency changes or test removal.
+  - No PHP semantic algorithm, user callback, FFI bridge or Composer-autoloadable stub.
+framework_php: null
+native_cpp: null
+php_extension:
+  repository_package: kumwe/kumwe-engine
+  module: kumwe_engine
+  platform_package: ext-kumwe_engine
+  php_namespace: Kumwe\Engine\
+  php_api_manifest: resources/api/v1.json
+  registered_classes:
+  - Kumwe\Engine\Runtime
+  - Kumwe\Engine\Exception\BindingFailure
+  methods_and_exceptions:
+  - 'Kumwe\Engine\Runtime::capabilities(): array'
+  - 'Kumwe\Engine\Runtime::compile(array $envelope): array'
+  - 'Kumwe\Engine\Runtime::execute(array $envelope): array'
+  - 'Kumwe\Engine\Runtime::release(string $planId): void'
+  - Kumwe\Engine\Exception\BindingFailure extends RuntimeException; native failure status is the exception code;
+    portable findings remain unchanged.
+  stubs_and_arginfo:
+  - stubs/kumwe_engine.stub.php
+  - src/kumwe_engine_arginfo.h
+  - tools/generate-arginfo.php --check; stubs are never autoloaded.
+  embedded_engine:
+    version: 0.0.0-dev
+    source_commit: 72fd09632e740f0bfd1bb09cc87749110ca21b90
+    source_archive_sha256: 0bad2590524f8d2328e6b5c21284fb3ce815b8332e1f55a8f6137cba77d155dc
+    abi_major: 1
+    capabilities:
+    - decimal-batch-draft/1
+    - formula-draft/1
+    - normalized-document-draft/1
+    - normalized-preparation-draft/1
+    - report-materialization-draft/1
+    - kumwe-canonical-json/generic-v1
+    corpus_digests:
+    - 11033679b018fdc9a192e954ef11089444a00a1d89c6279d3c192be9252cf42f
+    - 4eb1543929fcf5470eb8cae882127556cd57c02518109545483d8780266b561a
+    - 635db251898707828e24f12b1abb672273552f5f633186a725cc9f50ac08140c
+    - 65cde051396085a01e9723a120460c8e00519eb63acff80d7425533983f011b0
+    - 6949c2763e05a1b76ea4f6c29cc7c2df57eb25d80ee625078a1d16545a8b41f4
+    - 752f41632d2ad38d74c5c61db5ff5f373b9427596d7766449b84398ddb15bce2
+    - 84b6c2e55ae591c921536aa755cbb5a9a40a7a19847fe47415e55dce2614c177
+    - 84d21b12e7a2bfd752356d9a6e664bcb332e209d19017e7634e7485a4fa4e250
+    - 8a1c1dce8686d09ca5e53d7b1971620e887237c6019a1189549bd873ec6a87da
+    - 975116dc897a0bfdee4a08f9065eb10ccfec06a32f4eb93a48015b08af408c01
+    - b7c340b7d8df32bacd2b16a8f575a43b99052642b2c38cd7896370acbc947350
+    - dbc005bd77fdd764c873bdde57261bc6cb79a8463164fb83e0da8cbe7603161c
+    - e91c9b03f4d61942689a3d675d29cd1f386d9a9ac296a572b16e954196947e7a
+    - fce91bfe3c9614ec3862b50c0defc10a9b69ed021671f8382d774d8cb0a20668
+  handle_lifecycle:
+  - Runtime owns at most 64 immutable plans and 16 MiB encoded source; opaque random plan IDs belong only to their
+    creating Runtime.
+  - Explicit release consumes its native plan and source budget. Foreign, released and unknown IDs refuse; live
+    plans are never silently evicted.
+  - Objects cannot clone or serialize; destruction releases all remaining native plans and outputs through the Engine
+    ABI. No request-crossing handles or persistent cache.
+  - Input marshalling and output ownership are bounded; all exception/refusal paths preserve native cleanup.
+  pie:
+    metadata_path: composer.json
+    source_package_path: .
+    network_free_consumer_build: true
+    supported_tuples:
+    - PHP 8.5 NTS; Linux x86_64; exact PHP patch/Zend API and compiler/linker/flags recorded by configure; source
+      distribution.
+  dependency_injection:
+    provider: null
+    reason: The native module registers only its internal Runtime and BindingFailure at startup. Semantic Composer
+      adapters own their providers; App provisioning is a later separate task.
+tests:
+  moved_or_added:
+  - Native PHPT API/ownership/bounds/opaque result tests and every shared owner corpus replay.
+  - Exact Engine/source/build handshake, arginfo drift, source replacement refusal, installed binary export/linkage,
+    diagnostic PHP package provenance and Valgrind lifecycle tests.
+  - Independent source-built PHP ASan/UBSan suite, network-isolated PIE consumer and full whole-boundary benchmark.
+  remain_in_app_or_consumer:
+  - App execution/composition/authorization/storage/provisioning tests remain unchanged.
+  - Engine owns semantic algorithm, C ABI, thread safety, fuzz and portable corpus tests; Computation owns its semantic
+    adapter and CompiledProgram association/cleanup.
+  split_tests: []
+  prohibited_duplicates:
+  - No copied App or Composer semantic implementation or PHP fallback. Unchanged App/SDK benchmark oracle is an
+    exact external checkout excluded from published source.
+  corpora:
+  - corpus/canonical/generic-v1.json
+  - corpus/decimal/decimal-v1.tsv
+  - corpus/definition/formula-v1.json
+  - corpus/document/computed-normalization-v1.json
+  - corpus/document/document-profile-v1.json
+  - corpus/document/normalized-values-v1.json
+  - corpus/document/preparation-v1.json
+  - corpus/document/unicode-normalization-oracle-v1.json
+  - corpus/document/validation-v1.json
+  - corpus/document/validator-edges-v1.json
+  - corpus/document/validator-extension-v1.json
+  - corpus/reporting/materialization-v1.json
+documentation:
+  charter: CHARTER.md
+  readme: README.md
+  public_api: resources/api/v1.json
+  architecture: docs/memory.md
+  integration_or_consumer: docs/releasing.md
+  examples:
+  - tools/consumer.php
+  - tests/common.inc
+  changelog_record: CHANGELOG.md / Unreleased
+release_expectations:
+  version_policy: First stable binding 1.0.0 follows independently verified immutable Engine 1.0.0, exact re-embedding
+    and repeated final-source qualification. Candidate metadata grants no publication authority.
+  expected_artifact_types:
+  - PIE-installable source tar.gz
+  - SHA256SUMS
+  - SPDX source inventory
+  - GitHub OIDC source provenance
+  - External candidate and release attestations; complete built module tuple and binary hash
+  required_checks:
+  - Exact source-head source preparation, PHP binding/PHPT/Valgrind, ASan/UBSan, offline PIE and full whole-boundary
+    benchmark jobs.
+  - Authoritative v2 handoff schema, complete Engine lock and frozen ABI/capability/corpus identity.
+  - Independently verified Engine and portable semantic releases; no invented identities or flags.
+  - Stable source publisher refuses stale/skipped CI, tag moves, asset replacement and unsigned or mismatched source
+    provenance.
+  required_registry_or_installer: PIE 1.4.10; source builds without network after explicit toolchain provisioning.
+  required_external_attestation: true
+next_task:
+  phase_name: Finish exact candidate qualification, then re-embed independently verified immutable Engine and qualify
+    stable binding.
+  permitted_only_when:
+  - All exact-source native and binding gates pass and the external Engine candidate attestation is independently
+    reviewed.
+  - Stable embedding uses an actual published Engine archive and successful independent release verification.
+  consumer_repository: https://github.com/kumwe/computation
+  dependency_or_native_change: Publish the verified binding source and exact module identity; native Computation
+    and SDK consumption follow. App provisioning/cutover is separately authorized later.
+  namespace_or_api_replacements: []
+  files_to_update:
+  - vendor/engine
+  - resources/engine-lock.json
+  - resources/compatibility/v1.json
+  - resources/api/v1.json
+  - MIGRATION-HANDOFF.md
+  - README.md
+  - CHANGELOG.md
+  files_to_remove: []
+  tests_to_remove: []
+  tests_to_retain_or_add:
+  - Keep all cross-layer corpus, lifecycle, arginfo/source/build identity, offline install and boundary benchmark
+    checks.
+  di_or_provisioning_changes: []
+  capability_index_changes: []
+  changelog_and_evidence_changes:
+  - Retain NRM-2026-043/044 enabling evidence; completion_claim false is not an App roadmap completion claim.
+  - External candidate/release records bind the exact final source/head/tree, handoff and archive digests.
+  verification_commands:
+  - php tools/generate-arginfo.php --check
+  - php tools/verify-binding.php
+  - php tools/verify-engine.php
+  - phpize && ./configure --enable-kumwe_engine && make -j2
+  - NO_INTERACTION=1 REPORT_EXIT_STATUS=1 make test TESTS=tests
+  - python3 tools/release-source-test.py
+  - python3 tools/release-native-test.py
+  - sudo unshare --net -- env PATH="$PATH" COMPOSER_DISABLE_NETWORK=1 KUMWE_PIE_PATH="$(command -v pie)" bash tools/offline-install.sh
+concurrency:
+  likely_conflict_files:
+  - resources/engine-lock.json
+  - vendor/engine
+  - resources/compatibility/v1.json
+  - MIGRATION-HANDOFF.md
+  related_migrations:
+  - KUMWE-MIG-2026-011
+  ownership_conflicts: []
+  integration_train: null
+  resolution_rule: semantic-preservation
+governance:
+  roadmap_source_sha256: a202155ef1a65f5ab293d4f8397ebf4ac430db7f1e877c776bbe7851e6fe18d8
+  roadmap_refs: []
+  non_roadmap_refs:
+  - NRM-2026-043
+  - NRM-2026-044
+  completion_claim: false
+decisions:
+- Keep semantic algorithms exclusively in Engine and adapters exclusively in their Composer owners.
+- Qualify only PHP 8.5 NTS Linux x86_64; other tuples require new passing evidence.
+- Publish honest measured whole-boundary results, including slower workloads; App workload acceptance is later.
+blockers:
+- Current exact embedded Engine remains a development source; final stable embedding and independent Engine release
+  verification are pending.
+- Final-head native/binding qualification and external candidate/release records remain mandatory before stable
+  publication.
+---
 
-Change sets: NRM-2026-043 and NRM-2026-044. Scope: standalone native library and binding delivery. Draft PR: https://github.com/kumwe/kumwe-engine/pull/3. Phase: candidate cross-build. State: package-implemented candidate; no release or App integration claim.
+# Zend binding implementation handoff
 
-The PIE package `kumwe/kumwe-engine` installs module `kumwe_engine`, exposed to Composer as `ext-kumwe_engine`. Actual native classes are exclusively `Kumwe\Engine\Runtime` and `Kumwe\Engine\Exception\BindingFailure`; stubs cannot autoload. `resources/api/v1.json` defines the public surface. The native reference package retains its historical portable baseline; it does not implement these classes.
+## Migration/implementation summary
 
-Engine source identity is recorded in `resources/engine-lock.json`. This candidate must not merge or publish as stable extension Phase 1: that task requires an immutable Engine release and successful independent release attestation, then a new exact embedded-source lock and final-head extension gates. The current committed source snapshot is a permitted development cross-build, not a release substitute.
+The binding implements the complete native PHP transport and ownership surface for NRM-2026-043/044. Engine owns algorithms and semantic corpora. App integration remains a later task; no App source or test was moved.
 
-CI builds PHP 8.5 NTS Linux x86_64, executes PHPT/canonical corpus parity and Valgrind lifetime checks, and installs the exact source archive through PIE with networking disabled. Source digests and generated arginfo must match. Final evidence is the actual workflow at the final PR head; local evidence is separate from the final published-head CI gates.
+## Public API and responsibility
 
-The source closure includes Engine's pinned PCRE2 and Unicode inputs, with no build-time fetch or host PCRE2/ICU dependency. The native module linkage gate permits only the documented C/C++ system runtimes and rejects exported PCRE2 internals. Source replacement requires the previous bundle to match its reviewed file lock and compiled identity before replacing the complete tree; isolated regression cases cover dirty, untracked, symlink and changed-source refusals.
+[API manifest](resources/api/v1.json), [stubs](stubs/kumwe_engine.stub.php), [ownership rules](docs/memory.md) and [README](README.md) describe the complete internal Runtime and BindingFailure surface. All four methods, bounded plan IDs, opaque results and exception cleanup are checked by the native suite.
 
-The public decimal execute route preserves KED1/KER1 bytes and replays all 108 decimal vectors, complete valid batch ordering and refusal recovery. Configure independently records the complete PHP/Zend/compiler/linker/flags/ABI tuple; the native handshake binds its exact digest. A separate source-built debug PHP host exercises the same binding, embedded Engine and full acceptance/lifecycle suite under ASan and UBSan without suppressions.
+## Capability reuse/semantic input review
+
+[Engine lock](resources/engine-lock.json) binds the exact raw git archive and every embedded source file. The embedded contracts matrix identifies semantic owner sources/corpora. The binding adds transport features only, never semantic substitutes. The final stable step replaces the entire verified Engine closure and repeats all gates.
+
+## Consumer inventory
+
+Computation consumes the internal native Runtime through its own semantic adapter. The SDK verifies installer/archive and complete native tuples. PIE provisions source modules outside Composer request flows. No DI provider or autoload hook exists here. Later App infrastructure provisioning and Computation runtime adoption remain separate migrations.
+
+## Test ownership
+
+Engine retains C/C++ semantics, ABI and native threading tests. This repository owns PHP marshalling, request lifetime, arginfo, refusal recovery, binary linkage, exact source/build identity, offline installation and cross-layer corpus replay. App tests remain unchanged. The complete benchmark checks out its unchanged PHP oracle externally; it is excluded from the source distribution.
+
+## Next-task execution notes
+
+Follow [release instructions](docs/releasing.md): verify the immutable Engine release independently, replace its complete source through the guarded embed helper, update the lock/API/compatibility identities and this handoff, then repeat every exact-head quality lane. The release publisher requires stable source metadata and signed provenance before it may create immutable assets. Publish and independently verify both native releases before downstream stable native consumers; perform App provisioning only in a later task.
+
+## Drift check
+
+Engine replacement refuses dirty, unrecorded or symlinked old source and verifies complete incoming archive/file identities. Generated arginfo and configured build identity must match committed manifests and the loaded native tuple. Exact-head CI prevents synthetic PR merge archives from being reported as candidate heads. Any source change requires new source/handshake evidence and external attestation; released artifacts are never overwritten.
+
+## Validation recipe and observed local results
+
+Run the commands listed in the frontmatter and [release instructions](docs/releasing.md). The repaired predecessor candidate passed all five hosted quality lanes, including PHP 8.5 NTS Linux x86_64 package-attributed diagnostic capture, sanitizers, offline PIE and 176 whole-boundary cases with 48 capacity and 12 allocation probes. Those predecessor results establish repair evidence, not a passing attestation for a changed final source. Actual final-head module, installer, tuple, benchmark and source digests are retained externally by CI and independent verification.
+
+## Detailed boundary and lifecycle behavior
 
 The binding acceptance suite replays all 101 formula vectors (59 values, 17 compile refusals and 25 runtime refusals), all 116 report vectors (54 exact row results and 62 runtime refusals), and all 323 document, validator, normalized-value, preparation and computed-normalization owner vectors. Formula/report tests preserve opaque JSON float kinds and empty objects, and verify budget refusal followed by reuse. Document plans select the complete document-profile corpus digest. Dedicated tests retain converted report rounding/provenance and request-local domain instance identity, including refusal recovery. The existing 100-owner Valgrind lifecycle and offline PIE consumer now execute Unicode validation as well as formula plans.
 

@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify deterministic candidate source bundle and refusal gates
         run: |
           python3 tools/release-source-test.py
@@ -142,6 +144,8 @@ jobs:
       REPORT_EXIT_STATUS: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Check out exact PHP 8.5.10 sanitizer host
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -201,11 +205,21 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
         with:
           php-version: '8.5'
           coverage: none
-          tools: pie
+          tools: pie:1.4.10
+      - name: Verify exact PIE installer identity
+        run: |
+          pie_path="$(readlink -f "$(command -v pie)")"
+          echo "b88792235c8e80be568436d4cb043b49fd1869c89b64e83d23e2882ae19d70a8  $pie_path" | sha256sum --check
+          mkdir "$RUNNER_TEMP/pie-evidence"
+          pie --version | tee "$RUNNER_TEMP/pie-evidence/version.txt"
+          sha256sum "$pie_path" > "$RUNNER_TEMP/pie-evidence/installer.sha256"
+          git rev-parse HEAD > "$RUNNER_TEMP/pie-evidence/source-commit.txt"
       - name: Extract exact committed source archive
         run: |
           mkdir "$RUNNER_TEMP/kumwe-pie-source"
@@ -214,6 +228,13 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/kumwe-pie-source"
           sudo unshare --net -- env PATH="$PATH" COMPOSER_DISABLE_NETWORK=1 KUMWE_PIE_PATH="$(command -v pie)" bash tools/offline-install.sh
+          php tools/consumer.php > "$RUNNER_TEMP/pie-evidence/consumer-tuple.json"
+          cp build-identity.json "$RUNNER_TEMP/pie-evidence/"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: offline-pie-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/pie-evidence
+          if-no-files-found: error
   whole-boundary-benchmarks:
     needs: binding
     runs-on: ubuntu-24.04
