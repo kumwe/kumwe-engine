@@ -214,3 +214,95 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/kumwe-pie-source"
           sudo unshare --net -- env PATH="$PATH" COMPOSER_DISABLE_NETWORK=1 KUMWE_PIE_PATH="$(command -v pie)" bash tools/offline-install.sh
+  whole-boundary-benchmarks:
+    needs: binding
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: diagnostic-runtime
+          path: ${{ runner.temp }}/diagnostic-runtime
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: binding-evidence
+          path: ${{ runner.temp }}/binding-evidence
+      - name: Verify the captured PHP and independently recorded module tuple
+        run: |
+          python3 tools/diagnostic-runtime.py verify "$RUNNER_TEMP/diagnostic-runtime" \
+            --expected-commit "$(git rev-parse HEAD)" --activate
+          python3 - <<'PYCODE'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])
+          fixture = json.loads((root/'diagnostic-runtime/fixture.json').read_text())
+          module = root/'binding-evidence/modules/kumwe_engine.so'
+          assert hashlib.sha256(module.read_bytes()).hexdigest() == fixture['native_module_probe']['sha256'], 'Downloaded module differs from captured module probe'
+          PYCODE
+          cp "$RUNNER_TEMP/binding-evidence/build-identity.json" build-identity.json
+          fixture="$RUNNER_TEMP/diagnostic-runtime/bin/php"
+          "$fixture" -d extension="$RUNNER_TEMP/binding-evidence/modules/kumwe_engine.so" \
+            tools/consumer.php > "$RUNNER_TEMP/benchmark-consumer.json"
+          python3 -c 'import json,os; from pathlib import Path; p=Path(os.environ["RUNNER_TEMP"]); assert json.loads((p/"benchmark-consumer.json").read_text()) == json.loads((p/"binding-evidence/candidate-tuple.json").read_text()), "Benchmark module/host differs from tested binding tuple"'
+      - name: Read the immutable embedded Engine source identity
+        id: engine
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          value = json.load(open('resources/engine-lock.json'))['commit']
+          assert re.fullmatch('[0-9a-f]{40}', value), 'Engine source must be an exact commit'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('commit=' + value + '\n')
+          PY
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: kumwe/engine
+          ref: ${{ steps.engine.outputs.commit }}
+          path: benchmark-sources/engine
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: kumwe/app
+          ref: 24ecf956423c18933e824b43cea1bfb9127a79a9
+          path: benchmark-sources/app
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: kumwe/extension-sdk
+          ref: d0484b8733eaa57d076f567ffa5e997b9564b5fa
+          path: benchmark-sources/sdk
+      - name: Verify Engine closure and install the frozen oracle dependencies
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, pathlib, subprocess
+          lock = json.load(open('resources/engine-lock.json'))
+          root = pathlib.Path('benchmark-sources/engine')
+          archive = subprocess.check_output(['git', '-C', str(root), 'archive', '--format=tar', lock['commit']])
+          assert hashlib.sha256(archive).hexdigest() == lock['archive_sha256'], 'Engine archive differs'
+          for path, expected in lock['files'].items():
+              assert hashlib.sha256((root/path).read_bytes()).hexdigest() == expected, path
+          PY
+          curl --fail --silent --show-error --location \
+            https://getcomposer.org/download/2.10.3/composer.phar -o "$RUNNER_TEMP/composer.phar"
+          printf '7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6  %s\n' \
+            "$RUNNER_TEMP/composer.phar" | sha256sum --check --strict
+          "$RUNNER_TEMP/diagnostic-runtime/bin/php" "$RUNNER_TEMP/composer.phar" \
+            install --working-dir=tests/benchmark --no-dev --no-interaction --prefer-dist --no-plugins --no-scripts
+      - name: Measure complete calls, exact parity, allocations and synthetic saturation
+        run: |
+          python3 benchmark-sources/engine/benchmarks/e2e/run.py \
+            --php "$RUNNER_TEMP/diagnostic-runtime/bin/php" \
+            --extension "$RUNNER_TEMP/binding-evidence/modules/kumwe_engine.so" \
+            --engine "$PWD/benchmark-sources/engine" \
+            --app "$PWD/benchmark-sources/app" --sdk "$PWD/benchmark-sources/sdk" \
+            --autoload "$PWD/tests/benchmark/vendor/autoload.php" \
+            --output "$RUNNER_TEMP/whole-boundary-performance"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: whole-boundary-performance
+          path: |
+            ${{ runner.temp }}/whole-boundary-performance
+            ${{ runner.temp }}/benchmark-consumer.json
+            tests/benchmark/composer.lock
