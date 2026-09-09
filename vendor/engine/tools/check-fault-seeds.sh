@@ -4,18 +4,13 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 mutate_once() {
-  python3 - "$1" "$2" "$3" <<'PY'
-import pathlib
-import sys
-
-path = pathlib.Path(sys.argv[1])
-source = path.read_text()
-before, after = sys.argv[2:]
-matches = source.count(before)
-if matches != 1:
-    raise SystemExit(f"Fault mutation must match exactly once in {path}: found {matches}")
-path.write_text(source.replace(before, after, 1))
-PY
+  php -r '
+    [$program, $path, $before, $after] = $argv;
+    $source = file_get_contents($path);
+    $matches = substr_count($source, $before);
+    if ($matches !== 1) { throw new RuntimeException("Fault mutation must match exactly once in $path: found $matches"); }
+    if (file_put_contents($path, str_replace($before, $after, $source)) === false) { throw new RuntimeException("Cannot write fault fixture"); }
+  ' "$1" "$2" "$3"
 }
 for fault in negative-order tie-even magnitude-sign required-validation finding-order; do
   target="$work/$fault"

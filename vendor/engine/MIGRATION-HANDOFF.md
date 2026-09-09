@@ -276,7 +276,7 @@ next_task:
   - cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
   - cmake --build build --parallel 4
   - ctest --test-dir build --output-on-failure
-  - node tools/check-manifests.mjs build
+  - php tools/check-manifests.php build
   - bash tools/check-archive.sh
   - bash tools/check-fault-seeds.sh
 concurrency:

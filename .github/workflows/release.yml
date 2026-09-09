@@ -3,8 +3,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/release.yml'
-      - 'tools/release-native.py'
-      - 'tools/release-native-test.py'
+      - 'tools/release-native.php'
+      - 'tools/release-native-test.php'
   workflow_run:
     workflows: ['Native binding candidate']
     types: [completed]
@@ -27,8 +27,12 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.5'
+          coverage: none
       - name: Verify source publication identity, provenance and immutable retry guards
-        run: python3 tools/release-native-test.py
+        run: php tools/release-native-test.php
   publish:
     needs: publisher-tests
     if: >-
@@ -58,9 +62,13 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.5'
+          coverage: none
       - name: Require exact full CI and all stable source prerequisites
         id: source
-        run: python3 tools/release-native.py prepare "$RUNNER_TEMP/native-source-bundle"
+        run: php tools/release-native.php prepare "$RUNNER_TEMP/native-source-bundle"
       - name: Sign the five exact source evidence files with GitHub OIDC
         if: steps.source.outputs.already_published != 'true'
         id: provenance
@@ -72,5 +80,5 @@ jobs:
         env:
           PROVENANCE_PATH: ${{ steps.provenance.outputs.bundle-path }}
         run: >-
-          python3 tools/release-native.py publish "$RUNNER_TEMP/native-source-bundle"
+          php tools/release-native.php publish "$RUNNER_TEMP/native-source-bundle"
           --provenance "$PROVENANCE_PATH"

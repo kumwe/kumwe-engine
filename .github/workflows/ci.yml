@@ -14,11 +14,20 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.5'
+          coverage: none
       - name: Verify deterministic candidate source bundle and refusal gates
         run: |
-          python3 tools/release-source-test.py
-          python3 tools/release-source.py prepare "$RUNNER_TEMP/native-source-bundle"
-          python3 tools/release-source.py verify "$RUNNER_TEMP/native-source-bundle" --expected-commit "$(git rev-parse HEAD)"
+          php tools/verify-toolchain.php
+          php tools/release-source-test.php
+          php tools/release-native-test.php
+          php tools/test-embed-engine.php
+          php tools/test-diagnostic-attribution.php
+          php tools/benchmark-runtime-test.php
+          php tools/release-source.php prepare "$RUNNER_TEMP/native-source-bundle"
+          php tools/release-source.php verify "$RUNNER_TEMP/native-source-bundle" --expected-commit "$(git rev-parse HEAD)"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: candidate-source-bundle
@@ -54,20 +63,28 @@ jobs:
           php -n -v
           test "$(php -n -r 'echo PHP_VERSION;')" = "$(php-config --version)"
       - name: Verify diagnostic attribution and refusal regression tests
-        run: python3 tools/test-diagnostic-attribution.py
+        run: php tools/test-diagnostic-attribution.php
       - name: Verify committed source and generated API
         run: |
           composer validate --strict
           php tools/generate-arginfo.php --check
           php tools/verify-binding.php
           php tools/verify-engine.php
-          python3 tools/test-embed-engine.py
+          php tools/test-embed-engine.php
+      - name: Execute the complete native Engine suite
+        run: |
+          cmake -S vendor/engine -B "$RUNNER_TEMP/native-tests" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/native-tests" --parallel 2
+          ctest --test-dir "$RUNNER_TEMP/native-tests" --output-on-failure
+      - name: Verify native manifests and ownership fixtures
+        working-directory: vendor/engine
+        run: php tools/check-manifests.php "$RUNNER_TEMP/native-tests"
       - name: Build actual PHP extension
         run: |
           phpize
           ./configure --enable-kumwe_engine
           make -j2
-          python3 tools/verify-native-linkage.py
+          php tools/verify-native-linkage.php
       - name: Record independent source and standalone Engine CLI compatibility
         run: |
           php tools/expected-tuple.php > candidate-compatibility.json
@@ -90,14 +107,14 @@ jobs:
         run: php -n -d extension="$PWD/modules/kumwe_engine.so" tools/consumer.php > candidate-tuple.json
       - name: Capture and verify a relocatable diagnostic PHP runtime
         run: |
-          python3 tools/diagnostic-runtime.py self-test
-          python3 tools/diagnostic-runtime.py capture "$RUNNER_TEMP/diagnostic-capture" --module "$PWD/modules/kumwe_engine.so"
+          php tools/diagnostic-runtime.php self-test
+          php tools/diagnostic-runtime.php capture "$RUNNER_TEMP/diagnostic-capture" --module "$PWD/modules/kumwe_engine.so"
           mv "$RUNNER_TEMP/diagnostic-capture" "$RUNNER_TEMP/diagnostic runtime"
           fixture="$RUNNER_TEMP/diagnostic runtime"
           # Simulate ZIP's normalized modes before explicit verified activation.
           find "$fixture" -type f -exec chmod 0644 {} +
-          python3 tools/diagnostic-runtime.py verify "$fixture" --expected-commit "$(git rev-parse HEAD)"
-          python3 tools/diagnostic-runtime.py verify "$fixture" --expected-commit "$(git rev-parse HEAD)" --activate
+          php tools/diagnostic-runtime.php verify "$fixture" --expected-commit "$(git rev-parse HEAD)"
+          php tools/diagnostic-runtime.php verify "$fixture" --expected-commit "$(git rev-parse HEAD)" --activate
           "$fixture/bin/php" -r '
             $record = json_decode(file_get_contents($argv[1]), true, 64, JSON_THROW_ON_ERROR);
             foreach ($record["required_extensions"] as $name) {
@@ -109,7 +126,7 @@ jobs:
             echo "Captured PHP and all required extensions loaded without native defaults.\n";
           ' "$fixture/fixture.json"
           "$fixture/bin/php" -d extension="$PWD/modules/kumwe_engine.so" tools/consumer.php > diagnostic-runtime-consumer.json
-          python3 -c 'import json; assert json.load(open("candidate-tuple.json")) == json.load(open("diagnostic-runtime-consumer.json")), "Relocated runtime changed the exact consumer tuple"'
+          php tools/verify-workflow.php json-equal candidate-tuple.json diagnostic-runtime-consumer.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: diagnostic-runtime
@@ -251,33 +268,24 @@ jobs:
         with:
           name: binding-evidence
           path: ${{ runner.temp }}/binding-evidence
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.5'
+          coverage: none
       - name: Verify the captured PHP and independently recorded module tuple
         run: |
-          python3 tools/diagnostic-runtime.py verify "$RUNNER_TEMP/diagnostic-runtime" \
+          php tools/diagnostic-runtime.php verify "$RUNNER_TEMP/diagnostic-runtime" \
             --expected-commit "$(git rev-parse HEAD)" --activate
-          python3 - <<'PYCODE'
-          import hashlib, json, os
-          from pathlib import Path
-          root = Path(os.environ['RUNNER_TEMP'])
-          fixture = json.loads((root/'diagnostic-runtime/fixture.json').read_text())
-          module = root/'binding-evidence/modules/kumwe_engine.so'
-          assert hashlib.sha256(module.read_bytes()).hexdigest() == fixture['native_module_probe']['sha256'], 'Downloaded module differs from captured module probe'
-          PYCODE
+          php tools/verify-workflow.php module "$RUNNER_TEMP/diagnostic-runtime/fixture.json" "$RUNNER_TEMP/binding-evidence/modules/kumwe_engine.so"
           cp "$RUNNER_TEMP/binding-evidence/build-identity.json" build-identity.json
           fixture="$RUNNER_TEMP/diagnostic-runtime/bin/php"
           "$fixture" -d extension="$RUNNER_TEMP/binding-evidence/modules/kumwe_engine.so" \
             tools/consumer.php > "$RUNNER_TEMP/benchmark-consumer.json"
-          python3 -c 'import json,os; from pathlib import Path; p=Path(os.environ["RUNNER_TEMP"]); assert json.loads((p/"benchmark-consumer.json").read_text()) == json.loads((p/"binding-evidence/candidate-tuple.json").read_text()), "Benchmark module/host differs from tested binding tuple"'
+          php tools/verify-workflow.php json-equal "$RUNNER_TEMP/benchmark-consumer.json" "$RUNNER_TEMP/binding-evidence/candidate-tuple.json"
       - name: Read the immutable embedded Engine source identity
         id: engine
         run: |
-          python3 - <<'PY'
-          import json, os, re
-          value = json.load(open('resources/engine-lock.json'))['commit']
-          assert re.fullmatch('[0-9a-f]{40}', value), 'Engine source must be an exact commit'
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write('commit=' + value + '\n')
-          PY
+          php tools/verify-workflow.php engine-ref
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: kumwe/engine
@@ -295,15 +303,7 @@ jobs:
           path: benchmark-sources/sdk
       - name: Verify Engine closure and install the frozen oracle dependencies
         run: |
-          python3 - <<'PY'
-          import hashlib, json, pathlib, subprocess
-          lock = json.load(open('resources/engine-lock.json'))
-          root = pathlib.Path('benchmark-sources/engine')
-          archive = subprocess.check_output(['git', '-C', str(root), 'archive', '--format=tar', lock['commit']])
-          assert hashlib.sha256(archive).hexdigest() == lock['archive_sha256'], 'Engine archive differs'
-          for path, expected in lock['files'].items():
-              assert hashlib.sha256((root/path).read_bytes()).hexdigest() == expected, path
-          PY
+          php tools/verify-workflow.php upstream benchmark-sources/engine
           curl --fail --silent --show-error --location \
             https://getcomposer.org/download/2.10.3/composer.phar -o "$RUNNER_TEMP/composer.phar"
           printf '7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6  %s\n' \
@@ -319,7 +319,7 @@ jobs:
           exec "$RUNNER_TEMP/diagnostic-runtime/bin/php" -d memory_limit=1G -d display_errors=stderr "$@"
           SH
           chmod +x "$RUNNER_TEMP/benchmark-php"
-          python3 benchmark-sources/engine/benchmarks/e2e/run.py \
+          php tools/benchmark-runtime.php \
             --php "$RUNNER_TEMP/benchmark-php" \
             --extension "$RUNNER_TEMP/binding-evidence/modules/kumwe_engine.so" \
             --engine "$PWD/benchmark-sources/engine" \

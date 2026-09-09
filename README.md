@@ -1,6 +1,6 @@
 # Kumwe Engine PHP binding
 
-`kumwe/kumwe-engine` is the PIE source package for module `kumwe_engine` and Composer platform requirement `ext-kumwe_engine`. The proposed 1.0.0 source is an **unreleased candidate cross-build**, NRM-2026-043. It embeds one exact committed Engine source snapshot; it does not claim an immutable, externally verified Engine release.
+`kumwe/kumwe-engine` is the PIE source package for module `kumwe_engine` and Composer platform requirement `ext-kumwe_engine`. The proposed 1.0.0 source is an **unreleased candidate cross-build**, NRM-2026-043. It embeds one exact, digest-locked Engine source snapshot with a reviewed PHP tooling profile; it does not claim an immutable, externally verified Engine release.
 
 The actual extension registers `Kumwe\Engine\Runtime` and `Kumwe\Engine\Exception\BindingFailure`. Its methods are `capabilities(): array`, `compile(array $envelope): array`, `execute(array $envelope): array`, and `release(string $planId): void`. Stubs are documentation and are never autoloaded.
 
@@ -50,8 +50,8 @@ contains no Kumwe repository code and loads no Kumwe extension by default. Downl
 from the trusted binding run for the exact candidate head, into a private directory, then
 use the verifier from that trusted checkout before executing any captured file:
 
-    python3 tools/diagnostic-runtime.py verify /path/to/fixture --expected-commit FULL_COMMIT_SHA
-    python3 tools/diagnostic-runtime.py verify /path/to/fixture --expected-commit FULL_COMMIT_SHA --activate
+    php tools/diagnostic-runtime.php verify /path/to/fixture --expected-commit FULL_COMMIT_SHA
+    php tools/diagnostic-runtime.php verify /path/to/fixture --expected-commit FULL_COMMIT_SHA --activate
     /path/to/fixture/bin/php -v
 
 Activation restores executable permissions stripped by artifact ZIP downloads only after
@@ -59,3 +59,5 @@ all paths and bytes pass verification. The fixture still uses the host Linux ker
 system timezone/DNS/CA data; its manifest records that boundary. Pair it with the separate
 binding-evidence module from the same run for native diagnostics. This inventory is
 diagnostic evidence and makes no release-verification or attestation claim.
+
+Repository maintenance, source packaging, release verification, diagnostics and benchmark orchestration use PHP 8.5 CLI. Native execution remains C/C++ behind the Zend extension. The embedded source lock separately records the immutable upstream archive and the exact reviewed snapshot; upstream repository publishing tools are excluded from this binding distribution. Run `php tools/verify-toolchain.php` to check source languages and PHP syntax.

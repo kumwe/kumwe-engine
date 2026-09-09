@@ -212,8 +212,8 @@ next_task:
   - php tools/verify-engine.php
   - phpize && ./configure --enable-kumwe_engine && make -j2
   - NO_INTERACTION=1 REPORT_EXIT_STATUS=1 make test TESTS=tests
-  - python3 tools/release-source-test.py
-  - python3 tools/release-native-test.py
+  - php tools/release-source-test.php
+  - php tools/release-native-test.php
   - sudo unshare --net -- env PATH="$PATH" COMPOSER_DISABLE_NETWORK=1 KUMWE_PIE_PATH="$(command -v pie)" bash tools/offline-install.sh
 concurrency:
   likely_conflict_files:
@@ -257,7 +257,7 @@ The binding implements the complete native PHP transport and ownership surface f
 
 ## Capability reuse/semantic input review
 
-[Engine lock](resources/engine-lock.json) binds the exact raw git archive and every embedded source file. The embedded contracts matrix identifies semantic owner sources/corpora. The binding adds transport features only, never semantic substitutes. The final stable step replaces the entire verified Engine closure and repeats all gates.
+[Engine lock](resources/engine-lock.json) binds the exact upstream git archive, its original file inventory, the reviewed tooling profile and every actual embedded source file. The embedded contracts matrix identifies semantic owner sources/corpora. The binding adds transport features only, never semantic substitutes. The final stable step replaces the entire verified Engine closure and repeats all gates.
 
 ## Consumer inventory
 
@@ -295,3 +295,7 @@ correlation and portable findings without building an unused decoded result. Omi
 retains the original result shape. Current Computation requires this feature before requesting it;
 all compiled owner corpora execute in both formats with identical bytes and refusal codes. The
 independent expected tuple derives the feature list from the committed binding API manifest.
+
+## PHP and native tooling profile
+
+Packaging, publication checks, diagnostics, source refresh and benchmark orchestration now run in PHP. The bundled Engine retains its complete native test and semantic corpus closure. Repository-specific upstream publishing automation is excluded; the binding owns its own PHP release gates. The lock distinguishes immutable upstream source from the authenticated tooling overlay, and refresh refuses changed overlay bases. All passing evidence must be regenerated for this changed source.

@@ -11,7 +11,7 @@ with `buffer_view`, and call `buffer_release(&owner)` once cleanup is due. Relea
 calling release again on that same cleared slot is safe. The library never frees caller input.
 
 The exact framing and golden binary results are in [ABI](abi.md), `tests/support.hpp`,
-`tests/engine_test.cpp` and `tools/fuzz-seeds.mjs`. Only `tests/consumer` is a supported integration
+`tests/engine_test.cpp` and the committed corpus fixtures. Only `tests/consumer` is a supported integration
 example; internal C++ headers are private implementation details.
 
 Use an independently verified immutable Engine release for production bindings. ABI 1

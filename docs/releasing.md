@@ -2,20 +2,20 @@
 
 The binding source package statically includes one exact Engine source closure.
 `resources/engine-lock.json` identifies its commit, archive digest and every embedded
-file. `resources/compatibility/v1.json` currently marks both the binding and its
+file. Its `snapshot` record preserves the complete upstream file inventory and names the reviewed `php-native-tooling/v1` profile. The actual embedded `files` map records the transformed tree; upstream identity is never relabeled as an unmodified local tree. `resources/compatibility/v1.json` currently marks both the binding and its
 publication status as candidate. Source packaging must preserve those facts.
 
-`tools/release-source.py` prepares and verifies a deterministic source evidence bundle
+`tools/release-source.php` prepares and verifies a deterministic source evidence bundle
 without downloading, tagging, publishing, signing or claiming a release. Git, gzip and
-Python 3.12+ are source-tooling dependencies. The installed extension still builds from
+PHP 8.5 with JSON, SPL and zlib are source-tooling dependencies. The installed extension still builds from
 its committed C/C++ sources with the declared PHP/CMake compiler toolchain and no network.
 
 Run from a clean committed checkout, with a new evidence directory outside the repository:
 
 ```sh
-python3 tools/release-source-test.py
-python3 tools/release-source.py prepare ../binding-source-evidence
-python3 tools/release-source.py verify ../binding-source-evidence \
+php tools/release-source-test.php
+php tools/release-source.php prepare ../binding-source-evidence
+php tools/release-source.php verify ../binding-source-evidence \
   --expected-commit "$(git rev-parse HEAD)"
 ```
 
@@ -65,7 +65,7 @@ consumer cannot resolve the unregistered Access Control package. Its source/corp
 is recorded honestly; a missing external receipt cannot be replaced by a local declaration.
 
 The stable binding stage begins only after the immutable Engine release is independently
-verified. Re-embed that exact unmodified release, update its lock and reviewed compatibility
+verified. Re-embed that exact release through the guarded snapshot helper, independently review any tooling overlay, update its lock and reviewed compatibility
 metadata, and repeat the full supported PHP 8.5 NTS/Linux x86_64 build/install matrix.
 Broader platforms and ZTS need their own passing evidence before support claims change.
 Human review and the maintainer release process then publish the PIE-installable source
@@ -91,7 +91,7 @@ The captured runtime is consequently the same package-backed host that built and
 tested the module. Unknown origins continue to fail closed; assigning a guessed
 package name to cached bytes would not establish package provenance.
 
-`python3 tools/test-diagnostic-attribution.py` covers package/multiarch ownership,
+`php tools/test-diagnostic-attribution.php` covers package/multiarch ownership,
 merged-/usr path aliases and refusal of unowned builder binaries, mismatched paths,
 diversion-only responses and malformed owners. The existing diagnostic self-test
 and hosted capture/relocation/module-tuple checks remain mandatory. This fixture
@@ -101,8 +101,8 @@ is diagnostic-only and does not provide stable release or artifact attestation.
 
 The dependent `whole-boundary-benchmarks` CI job downloads this run's verified PHP
 fixture and tested module, checks the exact consumer tuple again, and replays the
-Engine-owned comparison harness. It checks out the exact embedded Engine commit
-and verifies its archive and every source digest against the binding lock. The
+PHP comparison harness in `tools/benchmark-runtime.php`, retaining the Engine-owned workload workers and probes. It checks out the exact embedded Engine commit
+and verifies its archive and every upstream source digest against the binding lock. Measurements use the tested binding snapshot and record the upstream workload identity separately. The
 unchanged PHP oracle is App `24ecf956423c18933e824b43cea1bfb9127a79a9` with SDK
 `d0484b8733eaa57d076f567ffa5e997b9564b5fa`; its isolated dependencies are locked under
 `tests/benchmark` and excluded from source/PIE distribution. No App change or
@@ -126,7 +126,7 @@ in the benchmark artifact's worker stderr logs.
 
 `Native source release` follows a successful `Native binding candidate` run on
 the exact current default-branch commit. A dispatch may name that successful run.
-`tools/release-native.py` requires every source, binding, sanitizer, offline PIE
+`tools/release-native.php` requires every source, binding, sanitizer, offline PIE
 and whole-boundary lane to pass and reruns the source gate with `--require-stable`.
 It refuses candidate identities, stale or skipped CI, and unverified Engine inputs.
 
@@ -135,8 +135,14 @@ repository, workflow, default-branch ref, exact commit and hosted build identity
 before creating an immutable version tag and draft. Retries compare existing
 assets without overwriting them, upload missing files, verify all six final assets
 and recheck the branch before publication. `build-provenance.sigstore.json` is the
-sixth asset. `python3 tools/release-native-test.py` tests refusal and retry cases.
+sixth asset. `php tools/release-native-test.php` tests refusal and retry cases.
 
 Source provenance does not certify an unbuilt module. The final binary's complete
 PHP/Zend/compiler/Engine tuple and independent published-release attestation remain
 separate requirements; the publisher never invents that verification.
+
+## Reviewed source refresh
+
+`php tools/embed-engine.php /path/to/engine FULL_COMMIT --same-source` verifies and reproduces the current snapshot. `--replace-source` permits an intentional upstream update only after the existing bundle matches its lock. The helper reapplies authenticated local tooling changes, rejects an upstream change beneath a modified file, and refuses unsupported implementation languages. Native sources, ABI manifests, semantic corpora and dependency license notices retain their independent digest checks. A transformed candidate is not an independently verified stable Engine release.
+
+CI runs the PHP tooling regression suites, complete embedded CTest/manifest gates, PHPT corpus replay, real module patch refusal, Valgrind, sanitizer builds, offline PIE installation and whole-boundary measurements. Diagnostic activation uses the small C++ helper to retain descriptor-based no-follow validation before restoring executable modes. All provenance and binary tuple checks apply to the actual tested source.
