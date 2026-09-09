@@ -320,6 +320,7 @@ jobs:
           SH
           chmod +x "$RUNNER_TEMP/benchmark-php"
           php tools/benchmark-runtime.php \
+            --diagnostic-runtime "$RUNNER_TEMP/diagnostic-runtime" \
             --php "$RUNNER_TEMP/benchmark-php" \
             --extension "$RUNNER_TEMP/binding-evidence/modules/kumwe_engine.so" \
             --engine "$PWD/benchmark-sources/engine" \

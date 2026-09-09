@@ -193,7 +193,7 @@
     "third_party/unicode/17.0.0/SpecialCasing.txt": "efc25faf19de21b92c1194c111c932e03d2a5eaf18194e33f1156e96de4c9588",
     "third_party/unicode/17.0.0/UnicodeData.txt": "2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c",
     "third_party/unicode/LICENSE": "356ee510031d46d09912cb68ca0951cceb620b109426585cec0d773c01c7d284",
-    "tools/check-architecture.sh": "398cc0e49086ca52f00b2df9f04ac7982cfa49d4707a8cb0a7f9d8171b0d2f3d",
+    "tools/check-architecture.sh": "c12e02058bda464e23baf3315c8193409ef2ba76e87abf74a5c052dd546ab421",
     "tools/check-consumer.sh": "544ea256fda591efe2be96ccf3de588c2f94296590380ea896a4900d2b29f332",
     "tools/check-fault-seeds.sh": "dfa13dcb41873b9ece551a05d054364ff247a56aed19f0863c6c4416e1101eb9",
     "tools/check-manifests.php": "378dbb60282d93937ff5aa9d10a17171c38b5f7ddc99b50f352720a0e1e7d6df",
