@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Hard-link the extension version to the embedded Engine release. The new `Engine sync`
+  workflow embeds every published `kumwe/engine` release byte for byte (checksum and GitHub
+  OIDC provenance verified), commits the embedding to the default branch and starts the
+  quality workflow; a green run on the default branch publishes tag `vX.Y.Z` with the
+  reproducible source archive, SPDX inventory, checksums and build provenance. The former
+  external-attestation publisher and the transformed tooling snapshot are removed;
+  `resources/engine-lock.json` is now schema v2 with the release tag, version, commit,
+  archive name and digest and every embedded file digest.
+- Support thread-safe PHP (ZTS) alongside NTS: the module keeps no cross-thread state, the
+  build record reports the actual thread model, `composer.json` declares `support-zts`, and
+  CI builds and tests the module against a thread-safe PHP 8.5.
+- Own the whole-boundary benchmark worker and allocation probes under `tools/benchmark/`
+  and measure against the embedded `vendor/engine` corpora; no Engine checkout is needed.
+
 - Use PHP CLI for source packaging, immutable publication checks, Engine embedding,
   diagnostic capture and benchmark orchestration, retaining native C/C++ execution.
   Port the regression suites and Unicode generator, preserve safe diagnostic

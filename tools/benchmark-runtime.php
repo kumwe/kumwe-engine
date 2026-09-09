@@ -54,6 +54,18 @@ function revision(string $path): array
         'status' => command(['git', '-C', $path, 'status', '--porcelain'])];
 }
 
+/** The embedded Engine is identified by its exact lock; any other checkout is identified by git. */
+function engine_identity(string $path): array
+{
+    $lock = dirname(__DIR__) . '/resources/engine-lock.json';
+    if (realpath($path) === realpath(dirname(__DIR__) . '/vendor/engine') && is_file($lock)) {
+        $record = json_decode(file_get_contents($lock), true, 512, JSON_THROW_ON_ERROR);
+        return ['path' => $path, 'release' => $record['release'], 'version' => $record['version'],
+            'commit' => $record['commit'], 'archive_sha256' => $record['archive_sha256']];
+    }
+    return revision($path);
+}
+
 function distribution(array $values): ?array
 {
     if ($values === []) { return null; }
@@ -199,7 +211,7 @@ function worker_process(array $args, string $backend, string $configPath, array 
         }
         array_push($invocation, '-d', 'memory_limit=1G', '-d', 'display_errors=stderr');
         if ($backend === 'native') { array_push($invocation, '-d', 'extension=' . $args['extension']); }
-        array_push($invocation, $args['engine'] . '/benchmarks/e2e/worker.php', $configPath);
+        array_push($invocation, $args['harness'] . '/worker.php', $configPath);
     }
     return [$invocation, $env];
 }
@@ -466,10 +478,10 @@ function allocations(array $args, array &$results): void
 {
     $probe = $args['output'] . '/allocation_probe.so'; $deepbind = $args['output'] . '/deepbind_probe.so';
     $compiled = command([$args['cc'], '-std=c11', '-O2', '-fPIC', '-shared', '-Wall', '-Wextra', '-Werror',
-        $args['engine'] . '/benchmarks/e2e/allocation_probe.c', '-o', $probe]);
+        $args['harness'] . '/allocation_probe.c', '-o', $probe]);
     if ($compiled['exit_code'] !== 0) { throw new \RuntimeException('Allocation probe build failed: ' . json_encode($compiled)); }
     $deepbindBuild = command([$args['cc'], '-std=c11', '-O2', '-fPIC', '-shared', '-Wall', '-Wextra', '-Werror', '-pthread',
-        $args['engine'] . '/benchmarks/e2e/deepbind_probe.c', '-ldl', '-o', $deepbind]);
+        $args['harness'] . '/deepbind_probe.c', '-ldl', '-o', $deepbind]);
     if ($deepbindBuild['exit_code'] !== 0) { throw new \RuntimeException('Deepbind diagnostic build failed: ' . json_encode($deepbindBuild)); }
     $results['allocation_probe'] = ['build' => $compiled, 'sha256' => sha($probe),
         'deepbind_build' => $deepbindBuild, 'deepbind_sha256' => sha($deepbind),
@@ -572,14 +584,14 @@ function compare(array $args, array $results): array
 function parse_arguments(array $argv): array
 {
     $args = ['php' => null, 'extension' => null, 'app' => null, 'sdk' => null, 'autoload' => null,
-        'engine' => dirname(__DIR__) . '/benchmark-sources/engine', 'output' => null, 'build_dir' => null,
+        'engine' => dirname(__DIR__) . '/vendor/engine', 'harness' => __DIR__ . '/benchmark', 'output' => null, 'build_dir' => null,
         'profiles' => PROFILES, 'sizes' => [1, 32, 256, 4096], 'samples' => 30, 'warmup' => 10,
         'workers' => [1, 2, 4, 8], 'capacity_seconds' => 3.0, 'capacity_size' => 32, 'burst_jobs' => 64,
         'cc' => 'cc', 'baseline' => null, 'diagnostic_runtime' => null, 'demand' => [], 'regression_threshold' => 0.10, 'smoke' => false];
     for ($i = 1; $i < count($argv); ++$i) {
         if ($argv[$i] === '--help' || $argv[$i] === '-h') {
             echo "Usage: php tools/benchmark-runtime.php --php PATH --extension PATH --app PATH --sdk PATH --autoload PATH --output NEW_DIRECTORY [options]\n";
-            echo "Options: --engine PATH --build-dir PATH --profiles NAME... --sizes N... --workers N... --samples N --warmup N\n";
+            echo "Options: --engine PATH --harness PATH --build-dir PATH --profiles NAME... --sizes N... --workers N... --samples N --warmup N\n";
             echo "         --capacity-seconds N --capacity-size N --burst-jobs N --cc COMMAND --baseline FILE\n";
             echo "         --demand PROFILE=UNITS_PER_SECOND --regression-threshold N --diagnostic-runtime DIRECTORY --smoke\n";
             exit(0);
@@ -628,7 +640,7 @@ function parse_arguments(array $argv): array
         || count(array_unique($args['sizes'])) !== count($args['sizes']) || count(array_unique($args['workers'])) !== count($args['workers'])) {
         throw new \InvalidArgumentException('Invalid bounds or unsupported non-Linux/32-bit host');
     }
-    foreach (['php', 'extension', 'app', 'sdk', 'autoload', 'engine'] as $key) {
+    foreach (['php', 'extension', 'app', 'sdk', 'autoload', 'engine', 'harness'] as $key) {
         $path = $args[$key] === null ? false : realpath($args[$key]);
         if ($path === false) { throw new \InvalidArgumentException("{$key} does not exist"); }
         $args[$key] = $path;
@@ -695,7 +707,7 @@ function main(array $argv): int
     foreach (file_hashes($args['engine'] . '/corpus', true) as $path => $digest) { $corpusHashes['corpus/' . $path] = $digest; }
     $harnessHashes = [];
     foreach (['worker.php', 'allocation_probe.c', 'deepbind_probe.c'] as $name) {
-        $harnessHashes[$name] = sha($args['engine'] . '/benchmarks/e2e/' . $name);
+        $harnessHashes[$name] = sha($args['harness'] . '/' . $name);
     }
     $harnessHashes['benchmark-runtime.php'] = sha(__FILE__);
     $metadata = ['format' => 'kumwe-app-native-performance/1', 'started_utc' => gmdate('Y-m-d\TH:i:s\Z'),
@@ -704,7 +716,7 @@ function main(array $argv): int
             'cpu' => $stableCpu, 'cpu_count' => (int) command(['getconf', '_NPROCESSORS_ONLN'])['stdout']],
         'lscpu' => $lscpu, 'php_sha256' => sha($args['php']), 'extension_sha256' => sha($args['extension']),
         'compiler' => command([$args['cc'], '--version']), 'arguments' => $args,
-        'sources' => ['engine' => revision($args['engine']), 'app' => revision($args['app']), 'sdk' => revision($args['sdk'])],
+        'sources' => ['engine' => engine_identity($args['engine']), 'app' => revision($args['app']), 'sdk' => revision($args['sdk'])],
         'harness_hashes' => $harnessHashes, 'corpus_hashes' => $corpusHashes, 'load_average_at_start' => sys_getloadavg(),
         'scope' => 'Whole unchanged App pure semantic methods versus actual Zend extension boundary, including host preparation codec, JSON/KED serialization, copies, decoding and final output encoding. SQL, HTTP, authorization, persistence and allocation services are outside both paths.',
         'timing_scope' => 'hrtime inside worker excludes correctness digest; capacity boundary includes process IPC and correctness verification; cold includes host plan construction, native compile and destruction.',

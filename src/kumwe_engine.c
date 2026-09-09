@@ -28,9 +28,6 @@
 #if DBL_MANT_DIG != 53 || FLT_RADIX != 2
 #error Canonical transport requires IEEE-754 binary64.
 #endif
-#ifdef ZTS
-#error This extension supports NTS only.
-#endif
 
 #define BINDING_MAX_BYTES ((size_t)16777216)
 #define BINDING_MAX_NODES ((size_t)262144)
@@ -756,8 +753,14 @@ PHP_MINFO_FUNCTION(kumwe_engine)
 {
     php_info_print_table_start();
     php_info_print_table_row(2, "kumwe_engine", PHP_KUMWE_ENGINE_VERSION);
+    php_info_print_table_row(2, "embedded Engine version", KUMWE_EMBEDDED_ENGINE_VERSION);
+    php_info_print_table_row(2, "embedded Engine release", KUMWE_EMBEDDED_ENGINE_RELEASE[0] != '\0' ? KUMWE_EMBEDDED_ENGINE_RELEASE : "unreleased source");
     php_info_print_table_row(2, "embedded Engine commit", KUMWE_EMBEDDED_ENGINE_COMMIT);
-    php_info_print_table_row(2, "release verification", "requires external source and build attestations");
+#ifdef ZTS
+    php_info_print_table_row(2, "thread safety", "ZTS");
+#else
+    php_info_print_table_row(2, "thread safety", "NTS");
+#endif
     php_info_print_table_end();
 }
 

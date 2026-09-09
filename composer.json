@@ -1,6 +1,6 @@
 {
   "name": "kumwe/kumwe-engine",
-  "description": "Bounded Zend binding to an exact embedded Kumwe Engine candidate.",
+  "description": "Bounded Zend binding to the exact embedded Kumwe Engine release of the same version.",
   "type": "php-ext",
   "license": "Apache-2.0",
   "require": {
@@ -11,7 +11,7 @@
   },
   "php-ext": {
     "extension-name": "kumwe_engine",
-    "support-zts": false,
+    "support-zts": true,
     "support-nts": true,
     "os-families": [
       "linux"

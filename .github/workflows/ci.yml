@@ -1,14 +1,16 @@
 name: Native binding candidate
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: binding-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   source-release-preparation:
-    if: github.event_name != 'push' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -18,22 +20,22 @@ jobs:
         with:
           php-version: '8.5'
           coverage: none
-      - name: Verify deterministic candidate source bundle and refusal gates
+      - name: Verify the toolchain policy, tooling regression suites and the reproducible source bundle
         run: |
           php tools/verify-toolchain.php
+          php tools/verify-engine.php
           php tools/release-source-test.php
-          php tools/release-native-test.php
-          php tools/test-embed-engine.php
+          php tools/test-sync-engine.php
           php tools/test-diagnostic-attribution.php
           php tools/benchmark-runtime-test.php
-          php tools/release-source.php prepare "$RUNNER_TEMP/native-source-bundle"
-          php tools/release-source.php verify "$RUNNER_TEMP/native-source-bundle" --expected-commit "$(git rev-parse HEAD)"
+          php tools/release-source.php prepare "$RUNNER_TEMP/source-release"
+          php tools/release-source.php verify "$RUNNER_TEMP/source-release" --expected-commit "$(git rev-parse HEAD)"
+          php tools/release-notes.php "$RUNNER_TEMP/source-release" > "$RUNNER_TEMP/source-release/RELEASE-NOTES.md"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: candidate-source-bundle
-          path: ${{ runner.temp }}/native-source-bundle
+          name: source-release-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/source-release
   binding:
-    if: github.event_name != 'push' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -64,21 +66,18 @@ jobs:
           test "$(php -n -r 'echo PHP_VERSION;')" = "$(php-config --version)"
       - name: Verify diagnostic attribution and refusal regression tests
         run: php tools/test-diagnostic-attribution.php
-      - name: Verify committed source and generated API
+      - name: Verify committed source, embedded Engine and generated API
         run: |
           composer validate --strict
+          php tools/verify-toolchain.php
           php tools/generate-arginfo.php --check
           php tools/verify-binding.php
           php tools/verify-engine.php
-          php tools/test-embed-engine.php
       - name: Execute the complete native Engine suite
         run: |
           cmake -S vendor/engine -B "$RUNNER_TEMP/native-tests" -DCMAKE_BUILD_TYPE=Release
           cmake --build "$RUNNER_TEMP/native-tests" --parallel 2
           ctest --test-dir "$RUNNER_TEMP/native-tests" --output-on-failure
-      - name: Verify native manifests and ownership fixtures
-        working-directory: vendor/engine
-        run: php tools/check-manifests.php "$RUNNER_TEMP/native-tests"
       - name: Build actual PHP extension
         run: |
           phpize
@@ -147,8 +146,51 @@ jobs:
             tests/*.diff
             tests/*.out
             config.log
+  binding-zts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NO_INTERACTION: '1'
+      REPORT_EXIT_STATUS: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.5'
+          coverage: none
+        env:
+          phpts: ts
+      - name: Require a thread-safe PHP host
+        run: |
+          php -v
+          php -r 'exit(PHP_ZTS ? 0 : 1);'
+          test "$(php -r 'echo PHP_VERSION;')" = "$(php-config --version)"
+      - name: Build the extension against thread-safe PHP
+        run: |
+          php tools/verify-engine.php
+          phpize
+          ./configure --enable-kumwe_engine
+          make -j2
+          php tools/verify-native-linkage.php
+          php -n -d extension="$PWD/modules/kumwe_engine.so" -r 'echo json_encode(["zts" => PHP_ZTS, "thread_model" => (new Kumwe\Engine\Runtime())->capabilities()["binding_build"]["thread_model"]]), "\n";'
+      - name: Execute PHPT, corpus parity and the native allocation lifecycle on ZTS
+        run: |
+          make test TESTS='tests' TEST_PHP_ARGS='-q'
+          php -n -d extension="$PWD/modules/kumwe_engine.so" tools/consumer.php > zts-tuple.json
+          php -n -d extension="$PWD/modules/kumwe_engine.so" tools/lifecycle.php
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: zts-evidence
+          path: |
+            zts-tuple.json
+            build-identity.json
+            tests/*.diff
+            tests/*.out
+            config.log
   address-undefined-sanitizers:
-    if: github.event_name != 'push' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -217,7 +259,6 @@ jobs:
             build-identity.json
             sanitizer-php-source/config.log
   clean-pie:
-    if: github.event_name != 'push' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -272,8 +313,9 @@ jobs:
         with:
           php-version: '8.5'
           coverage: none
-      - name: Verify the captured PHP and independently recorded module tuple
+      - name: Verify the captured PHP, the embedded Engine and the independently recorded module tuple
         run: |
+          php tools/verify-engine.php
           php tools/diagnostic-runtime.php verify "$RUNNER_TEMP/diagnostic-runtime" \
             --expected-commit "$(git rev-parse HEAD)" --activate
           php tools/verify-workflow.php module "$RUNNER_TEMP/diagnostic-runtime/fixture.json" "$RUNNER_TEMP/binding-evidence/modules/kumwe_engine.so"
@@ -282,15 +324,6 @@ jobs:
           "$fixture" -d extension="$RUNNER_TEMP/binding-evidence/modules/kumwe_engine.so" \
             tools/consumer.php > "$RUNNER_TEMP/benchmark-consumer.json"
           php tools/verify-workflow.php json-equal "$RUNNER_TEMP/benchmark-consumer.json" "$RUNNER_TEMP/binding-evidence/candidate-tuple.json"
-      - name: Read the immutable embedded Engine source identity
-        id: engine
-        run: |
-          php tools/verify-workflow.php engine-ref
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          repository: kumwe/engine
-          ref: ${{ steps.engine.outputs.commit }}
-          path: benchmark-sources/engine
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: kumwe/app
@@ -301,9 +334,8 @@ jobs:
           repository: kumwe/extension-sdk
           ref: d0484b8733eaa57d076f567ffa5e997b9564b5fa
           path: benchmark-sources/sdk
-      - name: Verify Engine closure and install the frozen oracle dependencies
+      - name: Install the frozen oracle dependencies
         run: |
-          php tools/verify-workflow.php upstream benchmark-sources/engine
           curl --fail --silent --show-error --location \
             https://getcomposer.org/download/2.10.3/composer.phar -o "$RUNNER_TEMP/composer.phar"
           printf '7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6  %s\n' \
@@ -323,7 +355,6 @@ jobs:
             --diagnostic-runtime "$RUNNER_TEMP/diagnostic-runtime" \
             --php "$RUNNER_TEMP/benchmark-php" \
             --extension "$RUNNER_TEMP/binding-evidence/modules/kumwe_engine.so" \
-            --engine "$PWD/benchmark-sources/engine" \
             --app "$PWD/benchmark-sources/app" --sdk "$PWD/benchmark-sources/sdk" \
             --autoload "$PWD/tests/benchmark/vendor/autoload.php" \
             --output "$RUNNER_TEMP/whole-boundary-performance"
@@ -335,3 +366,51 @@ jobs:
             ${{ runner.temp }}/whole-boundary-performance
             ${{ runner.temp }}/benchmark-consumer.json
             tests/benchmark/composer.lock
+  release:
+    name: Publish source release
+    needs: [source-release-preparation, binding, binding-zts, address-undefined-sanitizers, clean-pie, whole-boundary-benchmarks]
+    if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: binding-source-release-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GIT_AUTHOR_NAME: ${{ vars.KUMWE_RELEASE_AUTHOR_NAME || 'Lemuel' }}
+      GIT_AUTHOR_EMAIL: ${{ vars.KUMWE_RELEASE_AUTHOR_EMAIL || 'lemuel@vdm.to' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.5'
+          coverage: none
+      - name: Decide whether this commit is publishable under its hard-linked Engine version
+        id: gate
+        run: php tools/release-gate.php
+      - name: Assemble the reproducible source bundle for the tested commit
+        if: steps.gate.outputs.release == 'true'
+        run: |
+          php tools/release-source.php prepare "$RUNNER_TEMP/release"
+          php tools/release-source.php verify "$RUNNER_TEMP/release" --expected-commit "$(git rev-parse HEAD)"
+          test "$(php -r 'echo json_decode(file_get_contents($argv[1]), true)["version"];' "$RUNNER_TEMP/release/source.json")" = '${{ steps.gate.outputs.version }}'
+      - name: Attest GitHub OIDC build provenance for the source bundle
+        if: steps.gate.outputs.release == 'true'
+        id: provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            ${{ runner.temp }}/release/kumwe-engine-php-source.tar.gz
+            ${{ runner.temp }}/release/SHA256SUMS
+            ${{ runner.temp }}/release/source.json
+            ${{ runner.temp }}/release/source.spdx.json
+      - name: Tag the tested commit and publish the immutable release
+        if: steps.gate.outputs.release == 'true'
+        run: bash tools/release-publish.sh "$RUNNER_TEMP/release" "${{ steps.provenance.outputs.bundle-path }}"

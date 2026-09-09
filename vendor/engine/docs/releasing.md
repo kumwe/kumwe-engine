@@ -1,72 +1,86 @@
-# Release and candidate gates
+# Versioning and releases
 
-All five native kernels are implemented and have owner-corpus replay, bounded ABI execution,
-consumer builds and memory/security CI. `1.0.0` is the proposed first release;
-ABI 1 is frozen and no publication is inferred from that source version. Implementation completion does
-not establish release verification or App acceleration.
+Every merge to `main` that passes the complete `Native quality` workflow is published as
+an immutable source release. Green CI on the exact commit is the release gate; there is no
+separate publisher workflow and no external attestation that must exist before a tag can
+be created. Semantic-owner coordinates, corpus digests and any independent verification
+receipts stay recorded in `resources/contracts.json` as metadata and are printed in the
+release notes; they do not block publication.
 
-`resources/contracts.json` records exact published semantic-owner tags, commits and corpus paths.
-The recorded corpus bytes match those immutable source commits. External release attestations
-remain a separate requirement: publication and a matching hash alone do not establish that the
-owner release passed every programme acceptance gate. Updates must retain an exact coordinate;
-never use a moving branch, `latest`, or an unconstrained range for embedded native sources.
+## Version source of truth
 
-The current pending input is Reporting `v0.1.3`: its published source and unchanged
-materialization corpus are recorded, but its original-archive clean consumer cannot resolve
-the unregistered Access Control package. Its external attestation remains null, the report
-module remains unverified, and stable-source preparation refuses publication. Registering
-that dependency must be followed by actual independent verification before these flags change.
-
-The separate Computation Phase 1A prerequisite uses the published portable-only
-`v0.1.1` release at `fc9d049f8b675c8e19fd1672d49b5e206c9ad52a`. Its actual source archive,
-API, capability, portable corpus and external attestation identities are recorded in
-`resources/contracts.json`. Only the schema-valid durable independent receipt linked by that
-matrix establishes admission. It must cover the original archive, complete canonical schemas,
-package gates and a fresh offline authoritative consumer with no native extension or binding classes.
-Earlier malformed or superseded receipts cannot close the prerequisite.
-The later Computation native adapter successor still waits for verified Engine and extension
-releases; its publication and App adoption are separate steps.
-
-The release gates include the independently verified semantic release barrier, the frozen ABI compatibility fixture, a final supported-platform run, published representative whole-boundary performance
-evidence, and signed source/artifact provenance. The retained benchmark evidence includes slower
-native document, preparation and canonical workloads; a faster inner kernel cannot close that gap.
-Repeat the complete PHP/Zend comparison on the final artifact and retain all results. No App cutover
-or capacity claim follows from passing the native test suite.
-
-An independent candidate cross-build must consume the exact Engine PR-head archive in
-`kumwe/kumwe-engine` without build-time network retrieval. It checks Zend marshalling, module load,
-ABI/capability/corpus agreement, lifecycle and the claimed PHP matrix. Its external
-`ENGINE-CANDIDATE-ATTESTATION.yaml` binds both tested commits/trees and the archive digest; it must
-remain outside both source trees. Any tested-input change invalidates that evidence. Human merge
-and immutable Engine publication follow a passing current candidate gate. A separate verifier
-then attests the published Engine release before the stable extension embeds it.
-
-## Embedded distribution tooling
-
-This directory is the binding's reviewed native source snapshot. Its lock in
-`../../resources/engine-lock.json` records both the complete immutable upstream
-inventory and the actual embedded files. Repository-specific upstream workflows,
-duplicate publishers and development package managers are excluded from this
-distribution. All native C/C++ tests, ABI fixtures, semantic corpora and licensed
-dependency sources remain present.
-
-Source packaging and publication are owned by the binding's PHP tools. From the
-binding repository root:
+`resources/capabilities.json` `version` (mirrored into `computation.engine_version`) is the
+only declared version. `CMakeLists.txt` reads it, so `project(KumweEngine VERSION ...)`, the
+installed CMake package version and the runtime capabilities always agree.
 
 ```sh
-php tools/release-source-test.php
-php tools/release-native-test.php
-php tools/release-source.php prepare ../binding-source-evidence
-php tools/release-source.php verify ../binding-source-evidence --expected-commit "$(git rev-parse HEAD)"
+bash tools/version.sh get          # print the declared version
+bash tools/version.sh set 1.1.0    # declare a minor/major release in a pull request
+bash tools/version.sh next         # next patch above the declared version and published tags
 ```
 
-See [binding release instructions](../../../docs/releasing.md) for deterministic
-archives, SPDX inventory, stable-state refusal, exact CI identity, signed
-provenance and immutable retries. This normalized candidate cannot establish
-independent upstream release verification. Stable publication still requires the
-semantic-owner, Engine and binding evidence described above.
+`set` also refreshes the `resources/capabilities.json` digest recorded in
+`MIGRATION-HANDOFF.md`, which `tools/check-manifests.mjs` verifies.
 
-Native validation uses CMake/CTest, `php tools/check-manifests.php BUILD_DIRECTORY`,
-`php tools/generate-unicode-data.php --check`, and the retained native consumer,
-symbol, architecture and fault-seed checks. A fresh exact-source build is required
-after any tooling overlay change.
+## What the workflow does on `main`
+
+1. **`version`** reads the declared version. If tag `vVERSION` does not exist, this commit
+   is released as that version. If the tag already exists for a different commit, the job
+   bumps the patch (above the declared version and every published `vMAJOR.MINOR.*` tag),
+   commits `Release vX.Y.Z` to `main` and every later job tests that bump commit, so the
+   tagged commit is always the fully tested commit. Minor and major releases are declared
+   by editing the version in the pull request.
+2. **Quality lanes** (Linux GCC and Clang, macOS AppleClang, ASan/UBSan with fuzzing,
+   ThreadSanitizer, network-isolated archive consumer, fault seeds and a dry run of the
+   release bundle) run against that exact commit.
+3. **`release`** runs `tools/release-bundle.sh`, which exports the committed source twice
+   and requires identical bytes, writes the SPDX inventory, `source.json` and `SHA256SUMS`,
+   and refuses build residue, oracles or development-only tooling in the archive. GitHub
+   OIDC build provenance is attested for the bundle. `tools/release-publish.sh` creates the
+   annotated tag on the tested commit and publishes the GitHub release with notes from
+   `tools/release-notes.sh`. Tags are never moved and assets are never replaced; a rerun
+   verifies existing bytes and uploads only missing assets.
+4. **`notify-binding`** sends `repository_dispatch` `engine-release` to
+   `kumwe/kumwe-engine` with the version, tag, commit and archive digest. The binding then
+   embeds the exact archive and publishes the PHP extension under the same version. This
+   job needs the repository secret `KUMWE_BINDING_DISPATCH_TOKEN` (a fine-grained token
+   with Contents: read and write on `kumwe/kumwe-engine`). Without it the job fails with
+   that instruction; the binding also polls the latest Engine release on a schedule.
+
+A `workflow_dispatch` run on `main` follows the same rules, so it can be used to cut a
+patch release of the current `main` on demand.
+
+## Release assets
+
+| Asset | Content |
+|---|---|
+| `kumwe-engine-source.tar.gz` | `git archive --format=tar --prefix=kumwe-engine/ COMMIT \| gzip -n`; excludes `.github`, PHP oracles, benchmark evidence and Node release tooling (`.gitattributes` `export-ignore`) |
+| `SHA256SUMS` | digests of the archive, `source.spdx.json` and `source.json` |
+| `source.json` | version, tag, commit, tree, archive digest and size, ABI, capabilities, corpora, semantic inputs |
+| `source.spdx.json` | complete SPDX 2.3 inventory of the archive |
+| `build-provenance.sigstore.json` | the OIDC provenance bundle also stored in the GitHub attestation store |
+
+Verify a download:
+
+```sh
+sha256sum --check SHA256SUMS
+gh attestation verify kumwe-engine-source.tar.gz --repo kumwe/engine
+```
+
+## Repository settings the pipeline relies on
+
+- The `version` job pushes bump commits to `main` with the workflow token. Branch
+  protection must allow that push (or the bypass list must include GitHub Actions). If the
+  push is refused, the run reports it and skips the release; declaring the bump in the
+  pull request avoids the push entirely.
+- Bump and tag commits are authored as `Lemuel <lemuel@vdm.to>` unless repository
+  variables `KUMWE_RELEASE_AUTHOR_NAME` and `KUMWE_RELEASE_AUTHOR_EMAIL` override them.
+- Actions must be allowed to create releases (default `GITHUB_TOKEN` permissions are
+  requested per job; no personal token is needed for the release itself).
+
+## Tooling
+
+Bash, Git, `jq`, Node and `gh` are the only release-tooling dependencies, and they are
+used only by the workflow and by `tools/*.sh` and `tools/*.mjs`. None of them are needed
+to build or test the engine from the published archive, and none of the published files
+depend on them. No Python is used anywhere in this repository.

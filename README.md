@@ -1,6 +1,6 @@
 # Kumwe Engine PHP binding
 
-`kumwe/kumwe-engine` is the PIE source package for module `kumwe_engine` and Composer platform requirement `ext-kumwe_engine`. The proposed 1.0.0 source is an **unreleased candidate cross-build**, NRM-2026-043. It embeds one exact, digest-locked Engine source snapshot with a reviewed PHP tooling profile; it does not claim an immutable, externally verified Engine release.
+`kumwe/kumwe-engine` is the PIE source package for module `kumwe_engine` and Composer platform requirement `ext-kumwe_engine`. It embeds one exact, digest-locked Kumwe Engine source release under `vendor/engine`, byte for byte as published by [`kumwe/engine`](https://github.com/kumwe/engine), and is published under the same version: extension `vX.Y.Z` always contains Engine `vX.Y.Z`. See [versioning, Engine synchronisation and releases](docs/releasing.md).
 
 The actual extension registers `Kumwe\Engine\Runtime` and `Kumwe\Engine\Exception\BindingFailure`. Its methods are `capabilities(): array`, `compile(array $envelope): array`, `execute(array $envelope): array`, and `release(string $planId): void`. Stubs are documentation and are never autoloaded.
 
@@ -10,9 +10,9 @@ Canonical `execute` requests carry the GenericV1 profile, corpus digest, operati
 
 Decimal batch `execute` requests contain exactly `wire_version: 1`, `profile: "decimal-batch-draft/1"`, the committed decimal corpus SHA-256, and `input` holding opaque KED1 bytes. The result contains the same wire/profile and opaque KER1 `result` bytes. All four decimal operations, row ordering, rounding, refusal codes and resource budgets remain owned by the [embedded Engine ABI](vendor/engine/docs/abi.md). The binding limits each input/output to 1 MiB and never interprets decimal values.
 
-## Candidate build
+## Build
 
-The tested target is PHP 8.5 NTS, Linux x86_64, source installation. Other PHP versions, ZTS, Windows and other architectures are refused. Module startup also compares the executing PHP patch with the independently recorded build patch; a different patch refuses before registering classes. CMake 3.25+, a C11/C++20 compiler, PHP development headers/phpize and make must already be provisioned.
+The supported target is PHP 8.5, non-thread-safe (NTS) or thread-safe (ZTS), on Linux x86_64 from source. Other PHP versions, Windows and other architectures are refused at configure or compile time. Module startup also compares the executing PHP patch with the independently recorded build patch; a different patch refuses before registering classes. CMake 3.25+, a C11/C++20 compiler, PHP development headers/phpize and make must already be provisioned.
 
 ```sh
 php tools/verify-engine.php
@@ -22,13 +22,23 @@ make -j2
 NO_INTERACTION=1 REPORT_EXIT_STATUS=1 make test TESTS=tests
 ```
 
-CI also installs the exact Git source archive using PIE inside a network namespace with networking disabled. Configure compiles only the checked-in, hash-verified static Engine source. It cannot fetch source or select an ambient Engine library. PIE installation is a provisioning action; Composer scripts and PHP requests never install extensions.
+Published versions install with PIE from Packagist:
 
-`resources/engine-lock.json` records the exact source commit, archive SHA-256 and every file digest. `capabilities()` retains the native ABI/capability/corpus/build identity and adds the compiled extension version and embedded source identity. The `binding_build` record includes the exact PHP patch and Zend API, NTS model, OS/architecture/libc, compiler and linker versions, actual flags for the binding and embedded Engine/PCRE2, debug/sanitizer status, source distribution identity, and ABI minor/manifest digest. Configure writes `build-identity.json` independently before loading the module; `binding_build_digest` binds its complete bytes. Consumers supply an independently approved exact digest through `NativeCompatibility`, including for sanitizer builds, and compare the resulting tuple.
+```sh
+pie install kumwe/kumwe-engine
+```
+
+CI also installs the exact Git source archive using PIE inside a network namespace with networking disabled, and builds and tests the module against both a non-thread-safe and a thread-safe PHP 8.5. The extension keeps no state shared between threads: class entries and handlers are registered once at module startup, every `Runtime` and plan is request-local, and the Engine C ABI is reentrant (the Engine repository exercises its shared immutable plan under ThreadSanitizer). Configure compiles only the checked-in, hash-verified static Engine source. It cannot fetch source or select an ambient Engine library. PIE installation is a provisioning action; Composer scripts and PHP requests never install extensions.
+
+`resources/engine-lock.json` records the embedded Engine release tag, version, source commit, archive SHA-256 and every file digest; `php tools/verify-engine.php`, also run by configure, checks the tree against that lock and enforces the hard version link between `php_kumwe_engine.h`, `resources/compatibility/v1.json` and the embedded Engine. `capabilities()` retains the native ABI/capability/corpus/build identity and adds the compiled extension version and embedded source identity. The `binding_build` record includes the exact PHP patch and Zend API, thread model, OS/architecture/libc, compiler and linker versions, actual flags for the binding and embedded Engine/PCRE2, debug/sanitizer status, source distribution identity, and ABI minor/manifest digest. Configure writes `build-identity.json` independently before loading the module; `binding_build_digest` binds its complete bytes. Consumers supply an independently approved exact digest through `NativeCompatibility`, including for sanitizer builds, and compare the resulting tuple.
 
 The nearest semantic Composer package owns its interface adapter. App owns database access, authorization, HTTP, reference resolution and protected execution. This repository has no algorithms, fallback, FFI, user callbacks, subprocess runtime, or Composer interfaces registered at MINIT.
 
-See [migration handoff](MIGRATION-HANDOFF.md), [memory ownership](docs/memory.md), and [candidate compatibility](resources/compatibility/v1.json). Release and App adoption gates remain open.
+See [releasing](docs/releasing.md), [memory ownership](docs/memory.md), [compatibility](resources/compatibility/v1.json) and the [migration handoff](MIGRATION-HANDOFF.md).
+
+## Releases
+
+Every published Engine release is embedded automatically by the `Engine sync` workflow, which verifies the archive checksum and GitHub OIDC build provenance, commits `Embed Engine vX.Y.Z` to `main` and starts the quality workflow. When every lane passes on `main`, the release job tags `vX.Y.Z`, publishes the reproducible source archive with checksums, SPDX inventory and build provenance, and Packagist lists the new version with both thread-safety modes supported. A binding-only change ships with the next Engine release, because versions are hard-linked.
 
 Opaque compiled documents use KEB1/KER2 framing internally; canonical PHP values use KEC1 frames.
 
@@ -47,7 +57,7 @@ contracts and framing belong to the embedded Engine; Zend performs only marshall
 The diagnostic-runtime CI artifact captures the already installed PHP 8.5 CLI, curated
 extensions, ELF loader/dependencies and installed package license/version inventory. It
 contains no Kumwe repository code and loads no Kumwe extension by default. Download it
-from the trusted binding run for the exact candidate head, into a private directory, then
+from the trusted binding run for the exact tested head, into a private directory, then
 use the verifier from that trusted checkout before executing any captured file:
 
     php tools/diagnostic-runtime.php verify /path/to/fixture --expected-commit FULL_COMMIT_SHA
@@ -58,6 +68,6 @@ Activation restores executable permissions stripped by artifact ZIP downloads on
 all paths and bytes pass verification. The fixture still uses the host Linux kernel and
 system timezone/DNS/CA data; its manifest records that boundary. Pair it with the separate
 binding-evidence module from the same run for native diagnostics. This inventory is
-diagnostic evidence and makes no release-verification or attestation claim.
+diagnostic evidence only.
 
-Repository maintenance, source packaging, release verification, diagnostics and benchmark orchestration use PHP 8.5 CLI. Native execution remains C/C++ behind the Zend extension. The embedded source lock separately records the immutable upstream archive and the exact reviewed snapshot; upstream repository publishing tools are excluded from this binding distribution. Run `php tools/verify-toolchain.php` to check source languages and PHP syntax.
+Repository maintenance, source packaging, release gating, Engine synchronisation, diagnostics and benchmark orchestration use PHP 8.5 CLI; the release publisher is Bash around `gh`. Native execution remains C/C++ behind the Zend extension. The whole-boundary benchmark worker and allocation probes live under `tools/benchmark/`. Run `php tools/verify-toolchain.php` to check source languages and PHP syntax; Python and Node are not used anywhere in this repository.

@@ -116,8 +116,8 @@ php_extension:
     source_package_path: .
     network_free_consumer_build: true
     supported_tuples:
-    - PHP 8.5 NTS; Linux x86_64; exact PHP patch/Zend API and compiler/linker/flags recorded by configure; source
-      distribution.
+    - PHP 8.5 NTS and ZTS; Linux x86_64; exact PHP patch/Zend API, thread model and compiler/linker/flags recorded by
+      configure; source distribution.
   dependency_injection:
     provider: null
     reason: The native module registers only its internal Runtime and BindingFailure at startup. Semantic Composer
@@ -160,23 +160,21 @@ documentation:
   - tests/common.inc
   changelog_record: CHANGELOG.md / Unreleased
 release_expectations:
-  version_policy: First stable binding 1.0.0 follows independently verified immutable Engine 1.0.0, exact re-embedding
-    and repeated final-source qualification. Candidate metadata grants no publication authority.
+  version_policy: The extension version always equals the embedded Engine version. The Engine sync workflow embeds
+    every published Engine release byte for byte; a default-branch commit that embeds a published release and passes
+    every quality lane is published under that shared version (docs/releasing.md).
   expected_artifact_types:
   - PIE-installable source tar.gz
   - SHA256SUMS
   - SPDX source inventory
   - GitHub OIDC source provenance
-  - External candidate and release attestations; complete built module tuple and binary hash
   required_checks:
-  - Exact source-head source preparation, PHP binding/PHPT/Valgrind, ASan/UBSan, offline PIE and full whole-boundary
-    benchmark jobs.
-  - Authoritative v2 handoff schema, complete Engine lock and frozen ABI/capability/corpus identity.
-  - Independently verified Engine and portable semantic releases; no invented identities or flags.
-  - Stable source publisher refuses stale/skipped CI, tag moves, asset replacement and unsigned or mismatched source
-    provenance.
+  - Exact source-head source preparation, NTS and ZTS PHP binding/PHPT/Valgrind, ASan/UBSan, offline PIE and full
+    whole-boundary benchmark jobs.
+  - Complete Engine lock, verified Engine release checksum and build provenance, and frozen ABI/capability/corpus identity.
+  - The release job refuses unreleased embedded source, version drift, tag moves and asset replacement.
   required_registry_or_installer: PIE 1.4.10; source builds without network after explicit toolchain provisioning.
-  required_external_attestation: true
+  required_external_attestation: false
 next_task:
   phase_name: Finish exact candidate qualification, then re-embed independently verified immutable Engine and qualify
     stable binding.
@@ -213,7 +211,8 @@ next_task:
   - phpize && ./configure --enable-kumwe_engine && make -j2
   - NO_INTERACTION=1 REPORT_EXIT_STATUS=1 make test TESTS=tests
   - php tools/release-source-test.php
-  - php tools/release-native-test.php
+  - php tools/test-sync-engine.php
+  - php tools/verify-toolchain.php
   - sudo unshare --net -- env PATH="$PATH" COMPOSER_DISABLE_NETWORK=1 KUMWE_PIE_PATH="$(command -v pie)" bash tools/offline-install.sh
 concurrency:
   likely_conflict_files:
@@ -238,11 +237,10 @@ decisions:
 - Qualify only PHP 8.5 NTS Linux x86_64; other tuples require new passing evidence.
 - Publish honest measured whole-boundary results, including slower workloads; App workload acceptance is later.
 blockers:
-- The embedded Engine retains Reporting 0.1.3 as unverified because its clean consumer cannot resolve the missing
-  Access Control package registration. Its other semantic owners and portable Computation baseline have actual independent
-  receipts; no stable Engine release is claimed.
-- Final-head native/binding qualification and external candidate/release records remain mandatory before stable
-  publication.
+- The embedded Engine records Reporting 0.1.3 as unverified metadata because its clean consumer cannot resolve the
+  missing Access Control package registration; this no longer blocks publication.
+- The first binding release follows the first published Engine release: the Engine sync workflow embeds it and the
+  quality workflow publishes the binding under the same version.
 ---
 
 # Zend binding implementation handoff
