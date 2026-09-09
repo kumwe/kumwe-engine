@@ -28,7 +28,9 @@ $lines[] = '### Embedded Engine (hard-linked version)';
 $lines[] = '';
 $lines[] = '| Field | Value |';
 $lines[] = '|---|---|';
-$lines[] = '| Engine release | [' . $engine['release'] . '](' . $engineUrl . ') |';
+$lines[] = '| Engine release | ' . ($engine['release'] === null
+    ? 'unreleased source (not publishable until a published Engine release is embedded)'
+    : '[' . $engine['release'] . '](' . $engineUrl . ')') . ' |';
 $lines[] = '| Engine commit | `' . $engine['commit'] . '` |';
 $lines[] = '| Engine archive SHA-256 | `' . $engine['archive_sha256'] . '` (' . $engine['files'] . ' files embedded unchanged) |';
 $lines[] = '| C ABI | `' . $record['abi']['major'] . '.' . $record['abi']['minor'] . '` (' . $record['abi']['status'] . ') |';
