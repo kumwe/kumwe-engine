@@ -68,6 +68,28 @@ function replaceOnce(string $content, string $pattern, string $replacement, stri
     return $result;
 }
 
+/**
+ * The migration handoff records the embedded Engine coordinates and the lock digest; keep those
+ * lines truthful on every sync. Every pattern is anchored so a changed handoff shape fails loudly.
+ */
+function updateHandoff(string $content, array $lock, string $lockDigest): string
+{
+    $coordinate = $lock['version'] . ($lock['release'] === null ? '' : ' (' . $lock['release'] . ')') . ' at ' . $lock['commit'];
+    $edits = [
+        ['/^(    version_or_commit: )[0-9.]+(?: \(v[0-9.]+\))? at [a-f0-9]{40}$/m', '${1}' . $coordinate, 'semantic input coordinate'],
+        ['/^(    manifest_or_corpus: resources\/engine-lock\.json[^\n]*\n(?:      [^\n]*\n)*    sha256: )[a-f0-9]{64}$/m',
+            '${1}' . $lock['archive_sha256'], 'semantic input archive digest'],
+        ['/^(  - path: resources\/engine-lock\.json\n    sha256: )[a-f0-9]{64}$/m', '${1}' . $lockDigest, 'engine-lock manifest digest'],
+        ['/^(  embedded_engine:\n    version: )[0-9.]+$/m', '${1}' . $lock['version'], 'embedded Engine version'],
+        ['/^(    source_commit: )[a-f0-9]{40}$/m', '${1}' . $lock['commit'], 'embedded Engine commit'],
+        ['/^(    source_archive_sha256: )[a-f0-9]{64}$/m', '${1}' . $lock['archive_sha256'], 'embedded Engine archive digest'],
+    ];
+    foreach ($edits as [$pattern, $replacement, $what]) {
+        $content = replaceOnce($content, $pattern, $replacement, 'MIGRATION-HANDOFF.md ' . $what);
+    }
+    return $content;
+}
+
 function main(array $arguments): void
 {
     $options = parseArguments($arguments);
@@ -122,7 +144,8 @@ function main(array $arguments): void
     $headerPath = $root . '/php_kumwe_engine_build.h';
     $versionHeaderPath = $root . '/php_kumwe_engine.h';
     $compatibilityPath = $root . '/resources/compatibility/v1.json';
-    foreach ([$root . '/vendor', $root . '/resources', $target, $lockPath, $headerPath, $versionHeaderPath, $compatibilityPath] as $path) {
+    $handoffPath = $root . '/MIGRATION-HANDOFF.md';
+    foreach ([$root . '/vendor', $root . '/resources', $target, $lockPath, $headerPath, $versionHeaderPath, $compatibilityPath, $handoffPath] as $path) {
         if (is_link($path)) {
             throw new RuntimeException('Engine bundle and identity paths must not be symbolic links.');
         }
@@ -138,6 +161,8 @@ function main(array $arguments): void
     // Edit the declaration in place: re-encoding would turn the numeric-keyed status map into a list.
     $compatibility = replaceOnce(readFile($compatibilityPath), '/^(  "version": ")[^"]*(",?)$/m',
         '${1}' . $version . '${2}', 'resources/compatibility/v1.json');
+    $lockBytes = encode($lock);
+    $handoff = is_file($handoffPath) ? updateHandoff(readFile($handoffPath), $lock, hash('sha256', $lockBytes)) : null;
 
     makeDirectory(dirname($target));
     makeDirectory(dirname($lockPath));
@@ -154,7 +179,7 @@ function main(array $arguments): void
             }
         }
         $previousFiles = [];
-        foreach ([$lockPath, $headerPath, $versionHeaderPath, $compatibilityPath] as $path) {
+        foreach ([$lockPath, $headerPath, $versionHeaderPath, $compatibilityPath, $handoffPath] as $path) {
             $previousFiles[$path] = is_file($path) ? readFile($path) : null;
         }
         $backup = $staging . '/previous';
@@ -165,10 +190,13 @@ function main(array $arguments): void
             if (!rename($staging . '/bundle', $target)) {
                 throw new RuntimeException('Cannot install the Engine source tree.');
             }
-            writeFile($lockPath, encode($lock));
+            writeFile($lockPath, $lockBytes);
             writeFile($headerPath, buildHeader($lock));
             writeFile($versionHeaderPath, $versionHeader);
             writeFile($compatibilityPath, $compatibility);
+            if ($handoff !== null) {
+                writeFile($handoffPath, $handoff);
+            }
         } catch (Throwable $error) {
             try {
                 removeTree($target);

@@ -20,14 +20,14 @@
   diagnostic capture and benchmark orchestration, retaining native C/C++ execution.
   Port the regression suites and Unicode generator, preserve safe diagnostic
   activation with a C++ helper, and run complete native and binding gates in CI.
-- Record upstream archive provenance separately from the reviewed embedded tooling
-  snapshot; source refresh authenticates local overlays and rejects unsupported
-  implementation languages. Remove duplicate upstream publishing machinery from
-  the binding distribution without removing native tests or semantic corpora.
+- Superseded: the reviewed embedded tooling snapshot and its overlay refresh are
+  replaced by the byte-exact embedding of the published Engine archive described in the
+  first entry above; the source policy still rejects unsupported implementation languages.
 
 - Prepare the proposed 1.0.0 binding against frozen Engine ABI 1 without changing
-  its PHP methods, framing, ownership or corpus semantics. Preserve candidate
-  publication barriers until the actual immutable Engine release is verified.
+  its PHP methods, framing, ownership or corpus semantics. (The candidate publication
+  barriers this entry introduced are superseded by the hard-linked release described
+  in the first entry above.)
 - Bind all qualification checkouts to the exact source head, complete the v2
   extension handoff, and pin PIE 1.4.10 to its official PHAR SHA256 while retaining
   the actual network-isolated install/build tuple as external evidence.

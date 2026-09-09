@@ -40,13 +40,34 @@ try {
     $compatibility = "{\n  \"schema\": \"kumwe-zend-compatibility/v1\",\n  \"version\": \"0.0.0\",\n"
         . "  \"statuses\": {\n    \"0\": \"result\",\n    \"1\": \"BindingFailure:1\"\n  }\n}\n";
     writeFile($binding . '/resources/compatibility/v1.json', $compatibility);
+    $zeroDigest = str_repeat('0', 64);
+    $apiDigest = str_repeat('1', 64);
+    writeFile($binding . '/MIGRATION-HANDOFF.md', "---\nschema: kumwe-migration-handoff/v2\nsource:\n  semantic_inputs:\n"
+        . "  - owner: kumwe/engine\n    version_or_commit: 0.0.0 at " . str_repeat('0', 40) . "\n"
+        . "    manifest_or_corpus: resources/engine-lock.json; exact published release archive and complete\n"
+        . "      per-file closure\n    sha256: $zeroDigest\nownership:\n  public_manifests:\n"
+        . "  - path: resources/api/v1.json\n    sha256: $apiDigest\n  - path: resources/engine-lock.json\n    sha256: $zeroDigest\n"
+        . "php_extension:\n  embedded_engine:\n    version: 0.0.0\n    source_commit: " . str_repeat('0', 40) . "\n"
+        . "    source_archive_sha256: $zeroDigest\n    abi_major: 1\n---\n");
+    $handoffPath = $binding . '/MIGRATION-HANDOFF.md';
+    $handoffRecords = static function (array $lock) use ($handoffPath, $binding): void {
+        $handoff = readFile($handoffPath);
+        $coordinate = $lock['version'] . ($lock['release'] === null ? '' : ' (' . $lock['release'] . ')') . ' at ' . $lock['commit'];
+        check(str_contains($handoff, "    version_or_commit: $coordinate\n"), 'Handoff semantic coordinate is stale.');
+        check(str_contains($handoff, "      per-file closure\n    sha256: {$lock['archive_sha256']}\n"), 'Handoff semantic digest is stale.');
+        check(str_contains($handoff, "  - path: resources/engine-lock.json\n    sha256: " . hash_file('sha256', $binding . '/resources/engine-lock.json') . "\n"),
+            'Handoff lock digest is stale.');
+        check(str_contains($handoff, "  embedded_engine:\n    version: {$lock['version']}\n    source_commit: {$lock['commit']}\n"
+            . "    source_archive_sha256: {$lock['archive_sha256']}\n"), 'Handoff embedded Engine block is stale.');
+        check(str_contains($handoff, "  - path: resources/api/v1.json\n    sha256: " . str_repeat('1', 64) . "\n"), 'Unrelated handoff digest changed.');
+    };
 
     $git = static fn(string ...$arguments): string => trim(run($engine, 'git', ...$arguments));
     $git('init', '-q');
     $git('config', 'user.name', 'Source fixture');
     $git('config', 'user.email', 'source-fixture@example.invalid');
     $git('config', 'commit.gpgsign', 'false');
-    $engineSource = static function (string $version, string $runtimeVersion = null) use ($engine): void {
+    $engineSource = static function (string $version, ?string $runtimeVersion = null) use ($engine): void {
         foreach (['include/kumwe/engine', 'resources', 'src', 'tools'] as $directory) { makeDirectory($engine . '/' . $directory); }
         writeFile($engine . '/CMakeLists.txt', "cmake_minimum_required(VERSION 3.25)\nproject(Fixture VERSION $version)\n");
         writeFile($engine . '/LICENSE', "Apache-2.0\n");
@@ -106,6 +127,7 @@ try {
     check(is_executable($bundle . '/tools/check.sh'), 'Executable permission was not preserved.');
     check(str_contains(readFile($headerPath), '#define KUMWE_EMBEDDED_ENGINE_RELEASE ""'), 'Unreleased source must record an empty release.');
     verifyBundle($binding, $lock);
+    $handoffRecords($lock);
     ++$checks;
 
     // Re-embedding the identical archive is idempotent.
@@ -174,6 +196,12 @@ try {
     check(str_contains(readFile($versionPath), '"1.3.0"') && str_contains(readFile($compatibilityPath), "\"version\": \"1.3.0\""),
         'Declared versions did not follow the Engine.');
     verifyBundle($binding, $lock);
+    $handoffRecords($lock);
+    $handoffBytes = readFile($handoffPath);
+    writeFile($handoffPath, str_replace("  embedded_engine:\n    version: 1.3.0\n", "  embedded_engine:\n    edition: 1.3.0\n", $handoffBytes));
+    $sync([$nextArchive, '--commit', $next, '--release', 'v1.3.0'], false, 'MIGRATION-HANDOFF.md embedded Engine version');
+    check(readLock($binding)['version'] === '1.3.0' && verifyBundle($binding, readLock($binding)) === null, 'A refused handoff update changed the embedding.');
+    writeFile($handoffPath, $handoffBytes);
 
     // The hard link is enforced: a drifted extension version fails verification.
     writeFile($versionPath, str_replace('"1.3.0"', '"1.3.1"', readFile($versionPath)));
