@@ -299,10 +299,13 @@ final class Worker
         if ($this->closed) { return; }
         $status = proc_get_status($this->process);
         if ($status['running']) {
-            if (@fwrite($this->pipes[0], "{\"command\":\"stop\"}\n") === false) {
-                $this->abort(); throw new \RuntimeException("{$this->label}: cannot stop worker");
-            }
-            fflush($this->pipes[0]);
+            // The child may close stdin before its process is reaped. A failed
+            // stop write is therefore not an exit failure; EOF also requests
+            // shutdown. Preserve the actual process status and bounded wait.
+            @fwrite($this->pipes[0], "{\"command\":\"stop\"}\n");
+            @fflush($this->pipes[0]);
+            fclose($this->pipes[0]);
+            unset($this->pipes[0]);
             $deadline = hrtime(true) + 20_000_000_000;
             do {
                 $status = proc_get_status($this->process);

@@ -35,7 +35,12 @@ if (($argv[1] ?? null) === '--fixture-worker') {
     while (($line = fgets(STDIN)) !== false) {
         $request = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
         if (($request['command'] ?? null) === 'stop') { break; }
-        if ($mode === 'eof') { exit(0); }
+        if ($mode === 'eof' || $mode === 'eof-error') {
+            // Expose EOF while the process is still alive, deterministically
+            // exercising shutdown's closed-pipe / not-yet-reaped race.
+            fclose(STDIN); fclose(STDOUT); usleep(50000);
+            exit($mode === 'eof' ? 0 : 7);
+        }
         if ($mode === 'malformed') { echo "invalid-json\n"; continue; }
         if (($request['phase'] ?? '') === 'barrier') {
             $directory = $argv[3]; $marker = $argv[4];
@@ -131,6 +136,16 @@ try {
     $workers[] = $worker;
     refused(static fn () => $worker->request(job('decimal', 1)), 'worker EOF');
     close_workers($workers); $workers = [];
+    $worker = new Worker($args, 'php', 'eof-error', [], [PHP_BINARY, __FILE__, '--fixture-worker', 'eof-error']);
+    $workers[] = $worker;
+    refused(static fn () => $worker->request(job('decimal', 1)), 'worker EOF with failing exit');
+    try {
+        $worker->close();
+        throw new LogicException('Nonzero worker exit was hidden by cleanup');
+    } catch (RuntimeException $failure) {
+        check($failure->getMessage() === 'eof-error: exit 7', 'cleanup preserves actual nonzero worker status');
+    }
+    $workers = [];
     // Exercise the actual captured-loader route: ordinary wrappers remove LD_PRELOAD,
     // so probes must be explicit loader arguments and must not contaminate child environments.
     $fixtureRoot = $temp . '/diagnostic';
