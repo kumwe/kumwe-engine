@@ -319,7 +319,7 @@ jobs:
           exec "$RUNNER_TEMP/diagnostic-runtime/bin/php" -d memory_limit=1G -d display_errors=stderr "$@"
           SH
           chmod +x "$RUNNER_TEMP/benchmark-php"
-          php tools/benchmark-runtime.php \
+          php -d memory_limit=2G tools/benchmark-runtime.php \
             --diagnostic-runtime "$RUNNER_TEMP/diagnostic-runtime" \
             --php "$RUNNER_TEMP/benchmark-php" \
             --extension "$RUNNER_TEMP/binding-evidence/modules/kumwe_engine.so" \

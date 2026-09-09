@@ -171,7 +171,7 @@ C
     check(array_slice($instrumented, 0, 7) === [$fixtureRoot . '/lib/loader', '--inhibit-cache',
         '--library-path', $fixtureRoot . '/lib', '--preload', $probeEnv['LD_PRELOAD'], $fixtureRoot . '/runtime/php'],
         'diagnostic probe uses explicit captured loader preload');
-    check(!isset($environment['LD_PRELOAD'], $environment['LD_AUDIT'], $environment['LD_LIBRARY_PATH'])
+    check(!isset($environment['LD_PRELOAD']) && !isset($environment['LD_AUDIT']) && !isset($environment['LD_LIBRARY_PATH'])
         && $environment['PHPRC'] === $fixtureRoot . '/php.ini'
         && $environment['PHP_INI_SCAN_DIR'] === $fixtureRoot . '/empty-ini'
         && $environment['USE_ZEND_ALLOC'] === '0', 'diagnostic process environment is isolated');
