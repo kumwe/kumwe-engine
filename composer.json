@@ -23,7 +23,8 @@
       "composer validate --strict",
       "php tools/generate-arginfo.php --check",
       "php tools/verify-binding.php",
-      "php tools/verify-engine.php"
+      "php tools/verify-engine.php",
+      "php tools/verify-toolchain.php"
     ]
   }
 }

@@ -8,14 +8,13 @@ report materialization, and generic canonical encoding with streaming SHA-256.
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel 4
 ctest --test-dir build --output-on-failure
-node tools/check-manifests.mjs build
+php tools/check-manifests.php build
 bash tools/check-consumer.sh
 build/kumwe-engine-conformance
 ```
 
 CMake 3.25+, a C++20 compiler and a 64-bit Linux/macOS environment are required. The library,
-conformance executable and C consumer build offline with the standard library and the exact vendored PCRE2 source closure. Node and
-Bash and Python are test/release tooling only; PHP, Composer and App are neither build nor runtime dependencies.
+conformance executable and C consumer build offline with the standard library and the exact vendored PCRE2 source closure. PHP CLI and Bash run the development checks. Composer and App are not native build or runtime dependencies.
 
 Installed downstream usage:
 

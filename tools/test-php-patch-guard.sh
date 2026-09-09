@@ -9,16 +9,14 @@ restore() {
   make -j2 > /dev/null
 }
 trap restore EXIT
-python3 - <<'PYFIXTURE'
-from pathlib import Path
-p = Path('kumwe_engine_build_config.h')
-s = p.read_text()
-import re
-s, count = re.subn(r'^#define KUMWE_BINDING_PHP_VERSION .*$', '#define KUMWE_BINDING_PHP_VERSION "8.5.999-mismatch"', s, flags=re.M)
-if count != 1:
-    raise SystemExit('Missing unique compiled PHP patch guard')
-p.write_text(s)
-PYFIXTURE
+php <<'PHPFIXTURE'
+<?php
+$path = 'kumwe_engine_build_config.h';
+$source = file_get_contents($path);
+$source = preg_replace('/^#define KUMWE_BINDING_PHP_VERSION .*$/m', '#define KUMWE_BINDING_PHP_VERSION "8.5.999-mismatch"', $source, -1, $count);
+if ($count !== 1 || $source === null) { throw new RuntimeException('Missing unique compiled PHP patch guard'); }
+if (file_put_contents($path, $source) === false) { throw new RuntimeException('Cannot write patch guard fixture'); }
+PHPFIXTURE
 make -j2 > /dev/null
 set +e
 output=$(php -n -d extension="$PWD/modules/kumwe_engine.so" -r 'if (class_exists("Kumwe\\Engine\\Runtime", false)) { exit(97); }' 2>&1)

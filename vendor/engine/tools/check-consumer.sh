@@ -35,5 +35,5 @@ status=0
 test "$status" -eq 1
 printf '{"status":1}\n' > "$work/expected-refusal.json"
 cmp "$work/expected-refusal.json" "$work/refusal.json"
-if find "$work/install" -type f | grep -E '/(src|tests|tools)/|\.(php|py|tsv)$'; then exit 1; fi
+if find "$work/install" -type f | grep -E '/(src|tests|tools)/|\.(php|tsv)$'; then exit 1; fi
 printf 'Installed standalone C11 consumer and diagnostic CLI passed\n'

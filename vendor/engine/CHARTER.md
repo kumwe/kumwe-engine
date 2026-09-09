@@ -12,7 +12,7 @@ independent release verification and measured App improvement require their sepa
 
 Semantic meaning belongs to the framework package owning each contract. Exact published source
 coordinates and matching corpus hashes are recorded in resources/contracts.json; independent
-release verification remains mandatory before production release. Engine has no PHP namespace, Composer/PHP/Zend/PIE dependency,
+release verification remains mandatory before production release. The Engine runtime has no PHP namespace or Composer/PHP/Zend/PIE dependency,
 App service, database, network, authorization, transaction, trust, rendering or delivery behavior.
 
 The sole binding surface is C with the `kumwe_engine_v1_` prefix. Internal C++ uses
@@ -39,3 +39,5 @@ The existing bounded pattern validator requires one narrow reviewed third-party 
 Computed-field casing uses pinned Unicode 17 data; NFC uses Unicode 15.1, matching the frozen PHP
 8.5/ICU 74 owner. Generated internal tables are reproducible from licensed source data. These
 normalizers are private document operations; no general text-processing API is exported.
+
+This embedded snapshot uses PHP CLI for Unicode generation and manifest verification. The binding source lock records the reviewed tooling transformation separately from the immutable upstream archive. Native execution and ABI ownership are unchanged.

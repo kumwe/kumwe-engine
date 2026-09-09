@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Use PHP CLI for source packaging, immutable publication checks, Engine embedding,
+  diagnostic capture and benchmark orchestration, retaining native C/C++ execution.
+  Port the regression suites and Unicode generator, preserve safe diagnostic
+  activation with a C++ helper, and run complete native and binding gates in CI.
+- Record upstream archive provenance separately from the reviewed embedded tooling
+  snapshot; source refresh authenticates local overlays and rejects unsupported
+  implementation languages. Remove duplicate upstream publishing machinery from
+  the binding distribution without removing native tests or semantic corpora.
+
 - Prepare the proposed 1.0.0 binding against frozen Engine ABI 1 without changing
   its PHP methods, framing, ownership or corpus semantics. Preserve candidate
   publication barriers until the actual immutable Engine release is verified.
