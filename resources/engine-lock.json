@@ -7,7 +7,7 @@
   "archive_sha256": "c350db3ce8fed53b28ccaf835dc2474050a919e582765871f70a0caf45b12001",
   "files": {
     ".gitattributes": "0f228e95797d9178a320e0aa9b814005540b32fb2536952b41875ea0fe55d5d1",
-    ".gitignore": "bf37f975dee5afff047ad10175f62b5e584d678e857575a53edbb06caeece6e5",
+    ".gitignore": "f9bb25c955d5d88309412f9592e65acc9176837acce3da9063d9e86c21c0712f",
     "CHANGELOG.md": "ee0f3feded5d41be0367377b89f6cf2a777cf7551055ca56024ae86fb197a44a",
     "CHARTER.md": "eb3e9c41c1f5b76b82013007c34c2d7f74638d70f346d1a023cf5e652b70fbca",
     "CMakeLists.txt": "a880d3f6451a183076c412f0ea5d732764a504331ffd83bef5a20bbd988208b8",
