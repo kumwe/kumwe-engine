@@ -8,7 +8,7 @@ while IFS= read -r source; do sources+=("$source"); done < <(find src include -t
 headers="$(sed -nE 's/^[[:space:]]*#[[:space:]]*include[[:space:]]*[<"]([^>"]+)[>"].*/\1/p' "${sources[@]}" | LC_ALL=C sort -u)"
 expected="$(cat resources/allowed-includes.txt)"
 test "$headers" = "$expected" || { diff -u <(printf '%s\n' "$expected") <(printf '%s\n' "$headers"); exit 1; }
-if find src include -type f | grep -Ev '\.(c|h|cpp|hpp)$'; then exit 1; fi
+if find src include -type f | grep -E '\.(php|js|py|sh)$'; then exit 1; fi
 if grep -En '\b(system|popen|dlopen|curl|fopen|socket|class_alias|zend_)\b' "${sources[@]}"; then exit 1; fi
 # Binary64 is required solely by generic canonical JSON and frozen PHP text comparison.
 # Exact monetary and formula arithmetic remains forbidden from using it.

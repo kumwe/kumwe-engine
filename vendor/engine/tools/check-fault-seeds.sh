@@ -4,13 +4,19 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 mutate_once() {
-  php -r '
-    [$program, $path, $before, $after] = $argv;
-    $source = file_get_contents($path);
-    $matches = substr_count($source, $before);
-    if ($matches !== 1) { throw new RuntimeException("Fault mutation must match exactly once in $path: found $matches"); }
-    if (file_put_contents($path, str_replace($before, $after, $source)) === false) { throw new RuntimeException("Cannot write fault fixture"); }
-  ' "$1" "$2" "$3"
+  local path="$1" before="$2" after="$3" source="" stripped matches
+  # Read the whole file byte-for-byte (IFS= keeps leading/trailing whitespace,
+  # -d '' reads through newlines; read returns 1 at EOF, which is expected).
+  IFS= read -r -d '' source < "$path" || true
+  # Count literal occurrences (not lines): quoting the pattern disables globbing.
+  stripped="${source//"$before"/}"
+  matches=$(( (${#source} - ${#stripped}) / ${#before} ))
+  if [ "$matches" -ne 1 ]; then
+    printf 'Fault mutation must match exactly once in %s: found %s\n' "$path" "$matches" >&2
+    return 1
+  fi
+  # Quoting the replacement keeps "&" literal under bash 5.2 patsub_replacement.
+  printf '%s' "${source/"$before"/"$after"}" > "$path"
 }
 for fault in negative-order tie-even magnitude-sign required-validation finding-order; do
   target="$work/$fault"

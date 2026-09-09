@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/engine-source.php';
 
 $root = dirname(__DIR__);
-$lock = json_decode(\Kumwe\EngineSource\readFile($root . '/resources/engine-lock.json'), true, 512, JSON_THROW_ON_ERROR);
+$lock = \Kumwe\EngineSource\readLock($root);
 \Kumwe\EngineSource\verifyBundle($root, $lock);
-echo count($lock['files']) . " embedded Engine source digests and native tooling policy verified; release verification is separate.\n";
+echo count($lock['files']) . ' embedded Engine source digests verified; Engine ' . ($lock['release'] ?? 'unreleased source')
+    . ' (' . $lock['version'] . ' at ' . $lock['commit'] . ") and extension version " . $lock['version'] . " are hard-linked.\n";

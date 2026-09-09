@@ -1,0 +1,106 @@
+name: Engine sync
+# Embed the exact published Engine release archive and hard-link the extension version to it.
+# Triggered by kumwe/engine (repository_dispatch engine-release), by hand, or on a schedule that
+# picks up any release the dispatch missed. The commit lands on the default branch and the quality
+# workflow is started on it; a green run then publishes the binding under the same version.
+on:
+  repository_dispatch:
+    types: [engine-release]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Engine release tag to embed (empty means the latest published Engine release)
+        type: string
+        required: false
+  schedule:
+    - cron: '23 */6 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: engine-sync-${{ github.repository }}
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_BRANCH: ${{ github.event.repository.default_branch }}
+      GIT_AUTHOR_NAME: ${{ vars.KUMWE_RELEASE_AUTHOR_NAME || 'Lemuel' }}
+      GIT_AUTHOR_EMAIL: ${{ vars.KUMWE_RELEASE_AUTHOR_EMAIL || 'lemuel@vdm.to' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.5'
+          coverage: none
+      - name: Resolve the Engine release to embed
+        id: engine
+        env:
+          REQUESTED_TAG: ${{ github.event.client_payload.tag || inputs.tag }}
+          PAYLOAD_SHA256: ${{ github.event.client_payload.archive_sha256 }}
+        run: |
+          tag="$REQUESTED_TAG"
+          if [ -z "$tag" ]; then
+            tag="$(gh release view --repo kumwe/engine --json tagName --jq .tagName)"
+          fi
+          [[ "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo "::error::Not an Engine release tag: $tag"; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "payload_sha256=$PAYLOAD_SHA256" >> "$GITHUB_OUTPUT"
+      - name: Download the release assets and verify checksums and build provenance
+        id: assets
+        env:
+          TAG: ${{ steps.engine.outputs.tag }}
+          PAYLOAD_SHA256: ${{ steps.engine.outputs.payload_sha256 }}
+        run: |
+          dir="$RUNNER_TEMP/engine-release"
+          mkdir -p "$dir"
+          gh release download "$TAG" --repo kumwe/engine --dir "$dir" \
+            --pattern kumwe-engine-source.tar.gz --pattern SHA256SUMS --pattern source.json --pattern source.spdx.json
+          (cd "$dir" && sha256sum --check --strict SHA256SUMS)
+          gh attestation verify "$dir/kumwe-engine-source.tar.gz" --repo kumwe/engine \
+            --signer-workflow kumwe/engine/.github/workflows/ci.yml
+          sha256="$(sha256sum "$dir/kumwe-engine-source.tar.gz" | cut -d ' ' -f 1)"
+          if [ -n "$PAYLOAD_SHA256" ] && [ "$PAYLOAD_SHA256" != "$sha256" ]; then
+            echo "::error::The dispatched archive digest $PAYLOAD_SHA256 differs from the published asset $sha256"
+            exit 1
+          fi
+          commit="$(php -r 'echo json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR)["source"]["commit"];' "$dir/source.json")"
+          test "$(php -r 'echo json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR)["tag"];' "$dir/source.json")" = "$TAG"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Embed the exact archive and hard-link the extension version
+        run: |
+          php tools/sync-engine.php "${{ steps.assets.outputs.dir }}/kumwe-engine-source.tar.gz" \
+            --release "${{ steps.engine.outputs.tag }}" \
+            --commit "${{ steps.assets.outputs.commit }}" \
+            --expected-sha256 "${{ steps.assets.outputs.sha256 }}"
+          php tools/verify-engine.php
+          php tools/verify-toolchain.php
+      - name: Commit and push the embedding to the default branch
+        id: push
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "::notice::Engine ${{ steps.engine.outputs.tag }} is already embedded; nothing to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git add --all
+          git -c "user.name=$GIT_AUTHOR_NAME" -c "user.email=$GIT_AUTHOR_EMAIL" \
+            commit --quiet --message "Embed Engine ${{ steps.engine.outputs.tag }}" \
+            --message "Exact archive sha256 ${{ steps.assets.outputs.sha256 }} from kumwe/engine ${{ steps.assets.outputs.commit }}; extension version follows the Engine version."
+          git push origin "HEAD:refs/heads/$RELEASE_BRANCH"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "Pushed $(git rev-parse HEAD) to $RELEASE_BRANCH"
+      - name: Start the binding quality workflow on the new commit
+        if: steps.push.outputs.changed == 'true'
+        run: |
+          gh workflow run ci.yml --ref "$RELEASE_BRANCH"
+          echo "::notice::Native binding candidate started on $RELEASE_BRANCH; a green run publishes v$(php -r 'echo json_decode(file_get_contents("resources/engine-lock.json"), true)["version"];')."

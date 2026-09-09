@@ -1,15 +1,19 @@
 {
   "schema": "kumwe-zend-compatibility/v1",
-  "state": "candidate",
-  "release_verified": false,
   "version": "1.0.0",
+  "version_policy": "The extension version always equals the embedded Engine version recorded in resources/engine-lock.json; releases are published under that shared version.",
   "engine_lock": "resources/engine-lock.json",
   "php": "8.5",
-  "thread_model": "NTS",
+  "thread_models": [
+    "NTS",
+    "ZTS"
+  ],
   "os": "Linux",
   "architecture": "x86_64",
   "distribution": "self-contained-source",
   "abi_major": 1,
+  "abi_minor": 0,
+  "abi_manifest": "vendor/engine/resources/abi-manifest.json",
   "statuses": {
     "0": "result",
     "1": "BindingFailure:1",
@@ -24,9 +28,6 @@
   "finding_policy": "native portable findings preserved without translation",
   "fallback": false,
   "persistent_cache": false,
-  "publication_allowed": false,
-  "abi_minor": 0,
-  "abi_manifest": "vendor/engine/resources/abi-manifest.json",
   "build_identity": {
     "schema": "kumwe-zend-build/v1",
     "record": "build-identity.json",

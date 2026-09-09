@@ -1,148 +1,121 @@
-# Source releases and candidate verification
+# Versioning, Engine synchronisation and releases
 
-The binding source package statically includes one exact Engine source closure.
-`resources/engine-lock.json` identifies its commit, archive digest and every embedded
-file. Its `snapshot` record preserves the complete upstream file inventory and names the reviewed `php-native-tooling/v1` profile. The actual embedded `files` map records the transformed tree; upstream identity is never relabeled as an unmodified local tree. `resources/compatibility/v1.json` currently marks both the binding and its
-publication status as candidate. Source packaging must preserve those facts.
+The extension version is hard-linked to the Engine: extension `vX.Y.Z` always embeds
+Engine `vX.Y.Z`, byte for byte as published by `kumwe/engine`. Nothing here is versioned
+by hand. Two workflows keep the link and publish releases.
 
-`tools/release-source.php` prepares and verifies a deterministic source evidence bundle
-without downloading, tagging, publishing, signing or claiming a release. Git, gzip and
-PHP 8.5 with JSON, SPL and zlib are source-tooling dependencies. The installed extension still builds from
-its committed C/C++ sources with the declared PHP/CMake compiler toolchain and no network.
+## `Engine sync` (`.github/workflows/engine-sync.yml`)
 
-Run from a clean committed checkout, with a new evidence directory outside the repository:
+Runs when `kumwe/engine` sends `repository_dispatch` `engine-release` after publishing a
+release, when started by hand (optionally naming a tag), and every six hours as a fallback
+that picks up any release the dispatch missed. It:
+
+1. resolves the Engine release (the dispatched tag, the requested tag, or the latest
+   published release);
+2. downloads `kumwe-engine-source.tar.gz`, `SHA256SUMS`, `source.json` and
+   `source.spdx.json` from that release, checks `sha256sum --check --strict SHA256SUMS`,
+   verifies the archive's GitHub OIDC build provenance with `gh attestation verify
+   --repo kumwe/engine --signer-workflow kumwe/engine/.github/workflows/ci.yml`, and
+   compares the dispatched digest when one was sent;
+3. runs `php tools/sync-engine.php ARCHIVE --release vX.Y.Z --commit SHA --expected-sha256 HEX`,
+   which installs the archive under `vendor/engine` unchanged, writes
+   `resources/engine-lock.json` (schema `kumwe-embedded-engine/v2`: repository, version,
+   release, commit, archive name and SHA-256, every file digest) and
+   `php_kumwe_engine_build.h`, and sets the same version in `php_kumwe_engine.h` and
+   `resources/compatibility/v1.json`;
+4. commits `Embed Engine vX.Y.Z` to the default branch as `Lemuel <lemuel@vdm.to>`
+   (override with repository variables `KUMWE_RELEASE_AUTHOR_NAME` and
+   `KUMWE_RELEASE_AUTHOR_EMAIL`) and starts the `Native binding candidate` workflow on
+   that commit. If the release is already embedded nothing is committed.
+
+`php tools/verify-engine.php` (also run by `configure`) checks the embedded tree against
+the lock, the compiled handshake header against the lock, and the hard link between the
+extension version, the compatibility manifest and the embedded Engine's declared version.
+
+## `Native binding candidate` (`.github/workflows/ci.yml`)
+
+Every push to the default branch, pull request and manual run executes all lanes:
+
+| Lane | What it proves |
+|---|---|
+| `source-release-preparation` | toolchain policy, tooling regression suites, reproducible source bundle |
+| `binding` | NTS PHP 8.5 build against the package-attributed distro host, complete embedded Engine CTest suite, PHPT corpus parity, patch-guard refusal, Valgrind lifecycle, diagnostic runtime capture |
+| `binding-zts` | thread-safe PHP 8.5 build, PHPT corpus parity, consumer tuple and allocation lifecycle |
+| `address-undefined-sanitizers` | instrumented PHP host and module under ASan/UBSan |
+| `clean-pie` | PIE 1.4.10 install of the exact committed archive with networking disabled |
+| `whole-boundary-benchmarks` | complete PHP-versus-native comparison with exact parity checks |
+
+On the default branch, when every lane passed, the `release` job runs
+`php tools/release-gate.php`, which publishes only when all of the following hold:
+
+- the embedded Engine is a published release (`release` in the lock is not null);
+- the extension version equals that Engine version (enforced by `verify-engine.php`);
+- tag `vX.Y.Z` does not exist yet. If it already identifies this commit there is nothing
+  to do; if it identifies another commit the change is binding-only and ships with the
+  next Engine release (cut one by running the Engine's `Native quality` workflow on
+  `main`, which bumps the patch and dispatches the sync).
+
+It then assembles the bundle with `php tools/release-source.php prepare`, attests GitHub
+OIDC build provenance, creates the annotated tag on the tested commit, and publishes the
+GitHub release with notes from `php tools/release-notes.php`
+(`tools/release-publish.sh`). Tags are never moved and assets are never replaced.
+Packagist is auto-updated from the repository, so the tag appears as a new version of
+`kumwe/kumwe-engine` with both thread-safety modes marked supported.
+
+Release assets: `kumwe-engine-php-source.tar.gz` (`git archive --prefix=kumwe-engine-php/`
+piped through `gzip -n`, honouring `.gitattributes` export rules), `SHA256SUMS`,
+`source.json`, `source.spdx.json`, `build-provenance.sigstore.json`. Verify a download with:
 
 ```sh
-php tools/release-source-test.php
-php tools/release-source.php prepare ../binding-source-evidence
-php tools/release-source.php verify ../binding-source-evidence \
-  --expected-commit "$(git rev-parse HEAD)"
+sha256sum --check SHA256SUMS
+gh attestation verify kumwe-engine-php-source.tar.gz --repo kumwe/kumwe-engine
 ```
 
-The bundle contains the committed `kumwe-engine-php-source.tar.gz`, full per-file SPDX
-inventory `source.spdx.json`, `source.json`, `source.provenance.json` and `SHA256SUMS`.
-The source record binds the exact binding commit/tree to the archive and public manifests,
-plus the embedded Engine source commit/archive, ABI and compatibility identities. The
-SPDX inventory records the binding and the separate embedded Engine package and all
-exported files, retaining their upstream license notices. The provenance file is an
-unsigned in-toto source-assembly statement; it explicitly claims neither a compiled
-artifact nor release attestation. All checksums use relative artifact names.
+## Local verification
 
-Preparation builds the archive twice and requires identical bytes. Verification
-regenerates the archive, inventory and metadata from the independently supplied commit,
-checks complete source closure, and rejects even rehashed metadata that invents a release
-claim. It refuses missing/unrecorded artifacts, archive links/traversal, build residues,
-credential-like files, dirty tracked inputs and embedded Engine file/corpus/ABI drift.
-An optional `--expected-sha256` binds an independently approved source archive digest.
-An optional `--tag` checks an existing exact tag without creating or changing it.
-Its version must equal the declared binding version, with only the optional `v` prefix ignored;
-a same-commit tag with another version is refused even without `--require-stable`.
+```sh
+php tools/verify-toolchain.php      # PHP/C/C++/Shell only; no interpreter invocations
+php tools/verify-engine.php         # embedded tree, handshake header and hard version link
+php tools/release-source-test.php   # packaging, archive parsing and refusal cases
+php tools/test-sync-engine.php      # embedding admission, replacement and refusal cases
+php tools/release-source.php prepare ../binding-source-evidence
+php tools/release-source.php verify ../binding-source-evidence --expected-commit "$(git rev-parse HEAD)"
+```
 
-The actual release archive must be consumed by the existing clean PIE, phpize/configure,
-PHPT, sanitizer, lifecycle and compatibility gates. Its single top-level directory can
-be removed with `tar --strip-components=1` when extracting into a fresh build directory.
-Network access stays disabled during consumer installation. Stubs are documentation;
-no Composer runtime hook provisions the module.
+To embed a specific published Engine release by hand, download its assets and run the
+same `sync-engine.php` command the workflow uses; commit the result. To embed unreleased
+Engine source for development, build the archive with the Engine's
+`tools/release-bundle.sh` and omit `--release`; the lock then records `release: null`
+and the release gate refuses to publish until a published release is embedded.
 
-For stable source checks, add `--require-stable`. It refuses today's candidate/version,
-publication-disabled metadata, unfrozen Engine ABI and unverified semantic/Engine inputs.
-It also applies the embedded Engine's portable-only Computation Phase 1A prerequisite:
-that release must precede stable Engine publication, independently of the later native
-adapter candidate. The exact baseline version/tag/commit, archive/API/capability/corpus
-SHA256s, released runtime requirements without a native dependency, absence of native
-bindings, and external attestation reference must be recorded in the embedded contract
-matrix as `release-verified`. Missing or unresolved facts refuse stable preparation.
-Portable Computation `v0.1.1` has been published and independently verified separately;
-its corrected immutable receipt is recorded by the embedded Engine. The published native `v0.2.0`/`v0.2.1`
-packages and later adapter candidates cannot supply that portable baseline. Re-embedding
-a reviewed candidate cannot replace missing independent verification. The source record
-and unsigned provenance preserve this prerequisite, including null/unresolved facts.
-Candidate CI verifies packaging without that option. A stable-source check does not
-independently verify an external release attestation or grant publication authority.
+## Repository settings the pipeline relies on
 
-Reporting `v0.1.3` remains an unverified Engine prerequisite because its clean original-archive
-consumer cannot resolve the unregistered Access Control package. Its source/corpus identity
-is recorded honestly; a missing external receipt cannot be replaced by a local declaration.
-
-The stable binding stage begins only after the immutable Engine release is independently
-verified. Re-embed that exact release through the guarded snapshot helper, independently review any tooling overlay, update its lock and reviewed compatibility
-metadata, and repeat the full supported PHP 8.5 NTS/Linux x86_64 build/install matrix.
-Broader platforms and ZTS need their own passing evidence before support claims change.
-Human review and the maintainer release process then publish the PIE-installable source
-package with checksums, signed/verifiable source and artifact provenance, license inventory
-and advisories. Actual compiler/PHP/Zend/flags and binary hashes come from the final build
-identity and platform evidence, not this source-only inventory.
-
-Keep independently signed Engine candidate and release attestations and the binding
-release-verification record outside the tested source trees. Verify the published tag,
-archive, complete handshake, manifests and signed provenance in a separate verification
-session before App provisioning or Computation runtime adoption. No source-tool command
-creates those attestations, freezes an ABI or performs App integration.
+- `Engine sync` pushes to the default branch and starts `ci.yml` with the workflow token.
+  Branch protection must allow that push (or list GitHub Actions as a bypass).
+- `kumwe/engine` needs the repository secret `KUMWE_BINDING_DISPATCH_TOKEN` (fine-grained
+  token, Contents: read and write on `kumwe/kumwe-engine`) to dispatch immediately; the
+  six-hourly schedule covers the case where it is missing.
+- Releases and tags are created with the workflow token; no personal token is used.
 
 ## Diagnostic PHP host provenance
 
-The relocatable diagnostic fixture requires real installed-package attribution for
-its PHP executable, shared extensions, loader and ELF dependencies. The pinned
-`setup-php` action's PHP 8.5 binaries can come from an extracted php-builder cache
-and therefore cannot supply a `dpkg-query` ownership record. The binding CI lane
-explicitly installs/reinstalls the Ubuntu PHP 8.5 CLI, development and extension
-packages before compilation, then verifies the CLI/header version agreement.
-The captured runtime is consequently the same package-backed host that built and
-tested the module. Unknown origins continue to fail closed; assigning a guessed
-package name to cached bytes would not establish package provenance.
+The relocatable diagnostic fixture requires real installed-package attribution for its PHP
+executable, shared extensions, loader and ELF dependencies. The pinned `setup-php` action's
+PHP 8.5 binaries can come from an extracted php-builder cache and therefore cannot supply
+a `dpkg-query` ownership record. The `binding` lane explicitly installs the Ubuntu PHP 8.5
+CLI, development and extension packages before compilation, then verifies the CLI/header
+version agreement, so the captured runtime is the same package-backed host that built and
+tested the module. `php tools/test-diagnostic-attribution.php` covers ownership, multiarch
+and refusal cases. The fixture is diagnostic-only.
 
-`php tools/test-diagnostic-attribution.php` covers package/multiarch ownership,
-merged-/usr path aliases and refusal of unowned builder binaries, mismatched paths,
-diversion-only responses and malformed owners. The existing diagnostic self-test
-and hosted capture/relocation/module-tuple checks remain mandatory. This fixture
-is diagnostic-only and does not provide stable release or artifact attestation.
+## Whole-boundary measurements
 
-## Whole-boundary candidate measurements
-
-The dependent `whole-boundary-benchmarks` CI job downloads this run's verified PHP
-fixture and tested module, checks the exact consumer tuple again, and replays the
-PHP comparison harness in `tools/benchmark-runtime.php`, retaining the Engine-owned workload workers and probes. It checks out the exact embedded Engine commit
-and verifies its archive and every upstream source digest against the binding lock. Measurements use the tested binding snapshot and record the upstream workload identity separately. The
-unchanged PHP oracle is App `24ecf956423c18933e824b43cea1bfb9127a79a9` with SDK
+`whole-boundary-benchmarks` downloads the verified PHP fixture and tested module, checks
+the consumer tuple again, and runs `tools/benchmark-runtime.php` with the worker and
+allocation probes under `tools/benchmark/` against the embedded `vendor/engine` corpora.
+The unchanged PHP oracle is App `24ecf956423c18933e824b43cea1bfb9127a79a9` with SDK
 `d0484b8733eaa57d076f567ffa5e997b9564b5fa`; its isolated dependencies are locked under
-`tests/benchmark` and excluded from source/PIE distribution. No App change or
-integration is made.
-
-The external `whole-boundary-performance` artifact retains all six workload
-families at 1/32/256/4096 inputs, 30 measured samples, warm/cold plans, valid and
-hostile parity, allocation/RSS probes and 1/2/4/8-process synthetic saturation.
-It records the actual module, host, source and corpus identities, including
-slower native workloads. Correctness/refusal mismatches fail CI; measurements
-never assert an automatic speedup or production capacity result. Stable native
-qualification still requires review of the exact candidate's representative
-whole-call results and the independently verified release prerequisites.
-
-Both benchmark workers use the same finite 1GiB PHP memory budget so the widest
-4096-document oracle can complete its final JSON serialization. Native execution
-limits remain part of the measured and tested contract. PHP fatals are retained
-in the benchmark artifact's worker stderr logs.
-
-## Immutable source publication
-
-`Native source release` follows a successful `Native binding candidate` run on
-the exact current default-branch commit. A dispatch may name that successful run.
-`tools/release-native.php` requires every source, binding, sanitizer, offline PIE
-and whole-boundary lane to pass and reruns the source gate with `--require-stable`.
-It refuses candidate identities, stale or skipped CI, and unverified Engine inputs.
-
-GitHub OIDC signs all five source evidence files. The publisher verifies their
-repository, workflow, default-branch ref, exact commit and hosted build identity
-before creating an immutable version tag and draft. Retries compare existing
-assets without overwriting them, upload missing files, verify all six final assets
-and recheck the branch before publication. `build-provenance.sigstore.json` is the
-sixth asset. `php tools/release-native-test.php` tests refusal and retry cases.
-
-Source provenance does not certify an unbuilt module. The final binary's complete
-PHP/Zend/compiler/Engine tuple and independent published-release attestation remain
-separate requirements; the publisher never invents that verification.
-
-## Reviewed source refresh
-
-`php tools/embed-engine.php /path/to/engine FULL_COMMIT --same-source` verifies and reproduces the current snapshot. `--replace-source` permits an intentional upstream update only after the existing bundle matches its lock. The helper reapplies authenticated local tooling changes, rejects an upstream change beneath a modified file, and refuses unsupported implementation languages. Native sources, ABI manifests, semantic corpora and dependency license notices retain their independent digest checks. A transformed candidate is not an independently verified stable Engine release.
-
-CI runs the PHP tooling regression suites, complete embedded CTest/manifest gates, PHPT corpus replay, real module patch refusal, Valgrind, sanitizer builds, offline PIE installation and whole-boundary measurements. Diagnostic activation uses the small C++ helper to retain descriptor-based no-follow validation before restoring executable modes. All provenance and binary tuple checks apply to the actual tested source.
+`tests/benchmark` and excluded from the source archive. The artifact retains all six
+workload families at 1/32/256/4096 inputs, valid and hostile parity, allocation/RSS probes
+and 1/2/4/8-process saturation, including slower native workloads. Correctness mismatches
+fail CI; measurements never assert an automatic speedup or production capacity result.

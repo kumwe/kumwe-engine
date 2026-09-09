@@ -28,7 +28,7 @@ if (!is_string($zendHeader) || preg_match('/^#define[ \t]+ZEND_MODULE_API_NO[ \t
     throw new RuntimeException('The selected PHP development headers have no exact Zend module API.');
 }
 $zendApi = $apiMatch[1];
-if ($phpVersion !== PHP_VERSION || preg_match('/^[0-9]+$/D', $zendApi) !== 1 || PHP_ZTS || PHP_OS_FAMILY !== 'Linux'
+if ($phpVersion !== PHP_VERSION || preg_match('/^[0-9]+$/D', $zendApi) !== 1 || PHP_OS_FAMILY !== 'Linux'
     || php_uname('m') !== 'x86_64' || PHP_INT_SIZE !== 8) {
     throw new RuntimeException('Unverified PHP or target build tuple.');
 }
@@ -80,7 +80,7 @@ foreach (['config.m4', 'php_kumwe_engine.h', 'php_kumwe_engine_build.h', 'resour
     $files[$file] = $digest;
 }
 $record = ['schema' => 'kumwe-zend-build/v1', 'php_version' => PHP_VERSION, 'php_version_id' => PHP_VERSION_ID,
-    'zend_module_api' => (int) $zendApi, 'thread_model' => 'NTS', 'os' => PHP_OS_FAMILY,
+    'zend_module_api' => (int) $zendApi, 'thread_model' => PHP_ZTS ? 'ZTS' : 'NTS', 'os' => PHP_OS_FAMILY,
     'os_release' => php_uname('r'), 'architecture' => php_uname('m'), 'host' => $host, 'libc' => $libc,
     'compiler' => ['c' => ['command' => $cc, 'version' => $versionOf($cc)],
         'cxx' => ['command' => $cacheValue('CMAKE_CXX_COMPILER'),

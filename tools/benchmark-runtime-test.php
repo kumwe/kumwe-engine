@@ -114,7 +114,7 @@ try {
     refused(static fn () => parse_arguments([...$arguments, '--demand', 'unknown=10']), 'unknown demand');
     refused(static fn () => parse_arguments([...$arguments, '--workers', '1', '1']), 'duplicate worker counts');
     $args = ['output' => $temp, 'php' => PHP_BINARY, 'app' => __DIR__, 'sdk' => __DIR__,
-        'autoload' => __FILE__, 'engine' => __DIR__, 'extension' => __FILE__];
+        'autoload' => __FILE__, 'engine' => __DIR__, 'harness' => __DIR__ . '/benchmark', 'extension' => __FILE__];
     for ($i = 0; $i < 2; ++$i) {
         $workers[] = new Worker($args, 'php', 'fixture-' . $i, [],
             [PHP_BINARY, __FILE__, '--fixture-worker', 'normal', $temp, 'ready-' . $i]);

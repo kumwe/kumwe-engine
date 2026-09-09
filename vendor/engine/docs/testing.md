@@ -15,16 +15,18 @@ behavior and boundary coverage fails the gate. Downstream suites do not replace 
 | C consumer, CLI, architecture and exported symbols | Actual C linkage/ownership, all diagnostic routes, package boundaries and exact Linux ABI export allowlist |
 | Archive/installed consumer and fault seeds | Reproducible committed source, independent consumption and deliberate arithmetic/validation fault detection |
 
-Upstream qualification covers GCC/Clang Linux and AppleClang macOS builds, ASan/UBSan with leak detection and corpus-seeded
-libFuzzer, and the shared immutable-plan test under TSan. This binding snapshot runs the complete native CTest suite and manifest gate on its declared Linux tuple, plus its PHP/Valgrind/sanitizer/install checks. The exact workflow result is evidence for
-its tested source/platform only. Stable old-client ABI compatibility, final independent candidate
-attestation and release acceptance remain outstanding. Foreign fabricated pointers are outside the
+CI runs GCC/Clang Linux and AppleClang macOS builds, ASan/UBSan with leak detection and corpus-seeded
+libFuzzer, and the shared immutable-plan test under TSan. The exact workflow result is evidence for
+its tested source/platform only. A default-branch commit that passes every lane is published as
+an immutable source release by the same workflow; see [releasing](releasing.md). Independent
+downstream verification remains a separate activity. Foreign fabricated pointers are outside the
 C memory preconditions; null, owned, consumed and valid concurrently borrowed handles are tested.
 
 The extension owns Zend marshalling, request lifecycle and cross-layer replay. App retains composition,
 authorization, persistence, provisioning/recovery, acceptance and whole-path performance tests. No
-App implementation or unit test is removed by this package change. Test-only PHP oracle/benchmark
-sources are excluded from native source and extension distribution archives.
+App implementation or unit test is removed by this package change. Test-only PHP oracles and the
+retained benchmark evidence are excluded from the native source archive; the whole-boundary
+benchmark harness is owned by the binding repository.
 
 The test-only shared export probe omits `-z,defs` with sanitizers because Clang resolves its sanitizer
 runtime from the final executable; release probes retain it. No sanitizer diagnostic is suppressed.
