@@ -43,7 +43,7 @@ function remote_tag_commit(string $root, string $tag): ?string
 /** Without gh or a token this reports "no release", and the idempotent publisher then verifies or completes it. */
 function release_exists(string $tag): bool
 {
-    return command_output(['gh', 'release', 'view', $tag, '--json', 'id']) !== null;
+    return command_output(['gh', 'release', 'view', $tag, '--repo', getenv('GITHUB_REPOSITORY') ?: 'kumwe/kumwe-engine', '--json', 'id']) !== null;
 }
 
 $head = trim((string) command_output(['git', '-C', $root, 'rev-parse', 'HEAD']));
