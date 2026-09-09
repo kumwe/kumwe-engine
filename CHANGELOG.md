@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Make the release pipeline complete without people. The release gate
+  (`tools/release-gate.php`) completes any tag whose GitHub release is missing from the
+  commit the tag identifies (with the current tooling, then re-evaluates the tip in a
+  follow-up run), publishes nothing when only export-ignored files changed, and requests the
+  next Engine patch release itself for a binding-only change (repository secret
+  `KUMWE_ENGINE_DISPATCH_TOKEN`) instead of asking someone to start the Engine workflow.
+  Tags are never moved or deleted; a draft left by an interrupted publish is promoted, never
+  recreated. The Engine sync retries the quality workflow while the embedded version has no
+  published release. `tools/test-release-gate.php` covers every decision.
+- Fix the release publisher: `gh` now names the repository on every call and runs from the
+  checkout, so publishing no longer depends on the working directory.
 - Hard-link the extension version to the embedded Engine release. The new `Engine sync`
   workflow embeds every published `kumwe/engine` release byte for byte (checksum and GitHub
   OIDC provenance verified), commits the embedding to the default branch and starts the

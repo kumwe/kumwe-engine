@@ -1,8 +1,10 @@
 # Versioning, Engine synchronisation and releases
 
 The extension version is hard-linked to the Engine: extension `vX.Y.Z` always embeds
-Engine `vX.Y.Z`, byte for byte as published by `kumwe/engine`. Nothing here is versioned
-by hand. Two workflows keep the link and publish releases.
+Engine `vX.Y.Z`, byte for byte as published by `kumwe/engine`. Nothing here is versioned by
+hand and nobody creates, moves or deletes tags, edits releases or starts workflows by hand:
+people merge, and two workflows keep the link, publish releases and complete anything an
+earlier run left unfinished.
 
 ## `Engine sync` (`.github/workflows/engine-sync.yml`)
 
@@ -27,8 +29,8 @@ that picks up any release the dispatch missed. It:
    (override with repository variables `KUMWE_RELEASE_AUTHOR_NAME` and
    `KUMWE_RELEASE_AUTHOR_EMAIL`), refreshes the handoff digests, and starts the `Native
    binding candidate` workflow on that commit. If the release is already embedded nothing
-   is committed, but the quality workflow is still started when `vX.Y.Z` has not been
-   tagged yet, so a failed or cancelled run is retried on the next sync.
+   is committed, but the quality workflow is still started while `vX.Y.Z` has no published
+   GitHub release, so a failed, cancelled or interrupted run is retried on the next sync.
 
 `php tools/verify-engine.php` (also run by `configure`) checks the embedded tree against
 the lock, the compiled handshake header against the lock, and the hard link between the
@@ -48,22 +50,37 @@ Every push to the default branch, pull request and manual run executes all lanes
 | `whole-boundary-benchmarks` | complete PHP-versus-native comparison with exact parity checks |
 
 On the default branch, when every lane passed, the `release` job runs
-`php tools/release-gate.php`, which publishes only when all of the following hold:
+`php tools/release-gate.php`, which decides what the run releases, in this order:
 
-- the embedded Engine is a published release (`release` in the lock is not null);
-- the extension version equals that Engine version (enforced by `verify-engine.php`);
-- tag `vX.Y.Z` does not exist yet, or identifies this commit without its GitHub release
-  (a rerun then completes the publication). If it identifies another commit the change is
-  binding-only and ships with the next Engine release: start the Engine's `Native quality`
-  workflow on its `main` with the `bump` input enabled, which declares the next patch,
-  publishes it and dispatches the sync back here.
+1. **A tag without a published release is completed first.** If an earlier run tagged a
+   version and then failed before its GitHub release was published (or left a draft), this
+   run releases that tag from the commit it identifies, with the current release tooling,
+   and then starts a follow-up run so the tip of the default branch is evaluated afresh.
+   Tags are never moved or deleted.
+2. **An unreleased embedded Engine publishes nothing.** The binding is published only under
+   the version of a published Engine release (`release` in the lock is not null; the
+   extension version equals that Engine version, enforced by `verify-engine.php`).
+3. **An unreleased declared version is released.** If tag `vX.Y.Z` does not exist, this
+   commit is released as that version.
+4. **A published version whose released source is unchanged releases nothing.** If the tag
+   identifies another commit and the released-source identity (every exported path with its
+   mode and content digest) is the same, the merge changed only export-ignored files.
+5. **A binding-only change requests the next Engine release itself.** If the tag identifies
+   another commit and released source changed, the run starts the Engine's `Native quality`
+   workflow on its `main` with the `bump` input (repository secret
+   `KUMWE_ENGINE_DISPATCH_TOKEN`), unless a newer Engine release is already published or such
+   a run is already pending. The Engine declares and publishes the next patch and dispatches
+   the sync back here, which embeds it and publishes this change under the new version.
 
-It then assembles the bundle with `php tools/release-source.php prepare`, attests GitHub
-OIDC build provenance, creates the annotated tag on the tested commit, and publishes the
-GitHub release with notes from `php tools/release-notes.php`
-(`tools/release-publish.sh`). Tags are never moved and assets are never replaced.
-Packagist is auto-updated from the repository, so the tag appears as a new version of
-`kumwe/kumwe-engine` with both thread-safety modes marked supported.
+The job checks out the release tooling from the commit that triggered the run and,
+separately, the commit being released (`KUMWE_ROOT`), assembles the bundle with
+`php tools/release-source.php prepare`, attests GitHub OIDC build provenance, creates the
+annotated tag on the released commit, and publishes the GitHub release with notes from
+`php tools/release-notes.php` (`tools/release-publish.sh`, naming the repository explicitly
+on every `gh` call). Tags are never moved and assets are never replaced: a rerun verifies
+existing bytes, uploads only what is missing and promotes a draft left by an interrupted
+publish. Packagist is auto-updated from the repository, so the tag appears as a new version
+of `kumwe/kumwe-engine` with both thread-safety modes marked supported.
 
 Release assets: `kumwe-engine-php-source.tar.gz` (`git archive --prefix=kumwe-engine-php/`
 piped through `gzip -n`, honouring `.gitattributes` export rules), `SHA256SUMS`,
@@ -81,6 +98,7 @@ php tools/verify-toolchain.php      # PHP/C/C++/Shell only; no interpreter invoc
 php tools/verify-engine.php         # embedded tree, handshake header and hard version link
 php tools/release-source-test.php   # packaging, archive parsing and refusal cases
 php tools/test-sync-engine.php      # embedding admission, replacement and refusal cases
+php tools/test-release-gate.php     # every default-branch release decision and the released-source identity
 php tools/release-source.php prepare ../binding-source-evidence
 php tools/release-source.php verify ../binding-source-evidence --expected-commit "$(git rev-parse HEAD)"
 ```
@@ -93,12 +111,19 @@ and the release gate refuses to publish until a published release is embedded.
 
 ## Repository settings the pipeline relies on
 
-- `Engine sync` pushes to the default branch and starts `ci.yml` with the workflow token.
-  Branch protection must allow that push (or list GitHub Actions as a bypass).
+These are configured once; the workflow reports which one is missing when it cannot proceed.
+
+- `Engine sync` pushes the `Embed Engine vX.Y.Z` commit to the default branch and starts
+  `ci.yml` with the workflow token. Branch protection or rulesets must allow that push (or
+  list GitHub Actions as a bypass); without it no Engine release can be embedded.
+- Repository secret `KUMWE_ENGINE_DISPATCH_TOKEN`: a fine-grained token with Actions: read
+  and write on `kumwe/engine`, used only to request the next Engine patch release for a
+  binding-only change. Without it that request fails with this instruction.
 - `kumwe/engine` needs the repository secret `KUMWE_BINDING_DISPATCH_TOKEN` (fine-grained
   token, Contents: read and write on `kumwe/kumwe-engine`) to dispatch immediately; the
-  six-hourly schedule covers the case where it is missing.
-- Releases and tags are created with the workflow token; no personal token is used.
+  six-hourly schedule covers the case where it is missing. One fine-grained token with
+  Contents and Actions read/write on both repositories can serve as both secrets.
+- Releases and tags are created with the workflow token; no personal token is used for them.
 
 ## Diagnostic PHP host provenance
 

@@ -38,7 +38,7 @@ See [releasing](docs/releasing.md), [memory ownership](docs/memory.md), [compati
 
 ## Releases
 
-Every published Engine release is embedded automatically by the `Engine sync` workflow, which verifies the archive checksum and GitHub OIDC build provenance, commits `Embed Engine vX.Y.Z` to `main` and starts the quality workflow. When every lane passes on `main`, the release job tags `vX.Y.Z`, publishes the reproducible source archive with checksums, SPDX inventory and build provenance, and Packagist lists the new version with both thread-safety modes supported. A binding-only change ships with the next Engine release, because versions are hard-linked.
+Releases are fully automated; people only merge. Every published Engine release is embedded automatically by the `Engine sync` workflow, which verifies the archive checksum and GitHub OIDC build provenance, commits `Embed Engine vX.Y.Z` to `main` and starts the quality workflow. When every lane passes on `main`, the release job tags `vX.Y.Z`, publishes the reproducible source archive with checksums, SPDX inventory and build provenance, and Packagist lists the new version with both thread-safety modes supported. A release an earlier run left unfinished is completed by the next run, and nobody creates, moves or deletes a tag by hand. A binding-only change ships with the next Engine release, because versions are hard-linked; the workflow requests that Engine release itself.
 
 Opaque compiled documents use KEB1/KER2 framing internally; canonical PHP values use KEC1 frames.
 

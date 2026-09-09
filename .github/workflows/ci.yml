@@ -27,6 +27,7 @@ jobs:
           php tools/verify-engine.php
           php tools/release-source-test.php
           php tools/test-sync-engine.php
+          php tools/test-release-gate.php
           php tools/test-diagnostic-attribution.php
           php tools/benchmark-runtime-test.php
           php tools/release-source.php prepare "$RUNNER_TEMP/source-release"
@@ -380,10 +381,15 @@ jobs:
       contents: write
       id-token: write
       attestations: write
+      actions: write
     env:
       GH_TOKEN: ${{ github.token }}
       GIT_AUTHOR_NAME: ${{ vars.KUMWE_RELEASE_AUTHOR_NAME || 'Lemuel' }}
       GIT_AUTHOR_EMAIL: ${{ vars.KUMWE_RELEASE_AUTHOR_EMAIL || 'lemuel@vdm.to' }}
+      ENGINE_DISPATCH_TOKEN: ${{ secrets.KUMWE_ENGINE_DISPATCH_TOKEN }}
+      # The release tooling always comes from the commit that triggered this run; the source being released
+      # is checked out separately, because a tag whose release is missing is completed from its own commit.
+      KUMWE_ROOT: ${{ github.workspace }}/release-source
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -393,14 +399,41 @@ jobs:
         with:
           php-version: '8.5'
           coverage: none
-      - name: Decide whether this commit is publishable under its hard-linked Engine version
+      - name: Decide what this run releases under the hard-linked Engine version
         id: gate
         run: php tools/release-gate.php
-      - name: Assemble the reproducible source bundle for the tested commit
+      - name: Request the next Engine patch release for a binding-only change
+        if: steps.gate.outputs.engine_bump == 'true'
+        run: |
+          if [ -z "$ENGINE_DISPATCH_TOKEN" ]; then
+            echo '::error::Repository secret KUMWE_ENGINE_DISPATCH_TOKEN is not set. Create a fine-grained token with Actions: read and write on kumwe/engine and add it as that secret; this change is published under the next Engine release once that request can be sent.'
+            exit 1
+          fi
+          export GH_TOKEN="$ENGINE_DISPATCH_TOKEN"
+          latest="$(gh release view --repo kumwe/engine --json tagName --jq .tagName)"
+          if [ "$latest" != '${{ steps.gate.outputs.engine_release }}' ]; then
+            echo "::notice::Engine $latest is published and not embedded yet; the Engine sync carries this change, so no further release is requested."
+            exit 0
+          fi
+          pending="$(gh run list --repo kumwe/engine --workflow ci.yml --event workflow_dispatch --json status --jq '[.[] | select(.status == "queued" or .status == "in_progress")] | length')"
+          if [ "$pending" != "0" ]; then
+            echo "::notice::An Engine run started by request is already pending; its release carries this change."
+            exit 0
+          fi
+          gh workflow run ci.yml --repo kumwe/engine --ref main -f bump=true
+          echo "::notice::Requested the next Engine patch release; its sync embeds it here and a green run publishes this change under that version."
+      - name: Check out the commit being released
+        if: steps.gate.outputs.release == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.gate.outputs.sha }}
+          path: release-source
+          fetch-depth: 0
+      - name: Assemble the reproducible source bundle for the released commit
         if: steps.gate.outputs.release == 'true'
         run: |
           php tools/release-source.php prepare "$RUNNER_TEMP/release"
-          php tools/release-source.php verify "$RUNNER_TEMP/release" --expected-commit "$(git rev-parse HEAD)"
+          php tools/release-source.php verify "$RUNNER_TEMP/release" --expected-commit '${{ steps.gate.outputs.sha }}'
           test "$(php -r 'echo json_decode(file_get_contents($argv[1]), true)["version"];' "$RUNNER_TEMP/release/source.json")" = '${{ steps.gate.outputs.version }}'
       - name: Attest GitHub OIDC build provenance for the source bundle
         if: steps.gate.outputs.release == 'true'
@@ -418,7 +451,13 @@ jobs:
           status=0
           bash tools/release-publish.sh "$RUNNER_TEMP/release" "${{ steps.provenance.outputs.bundle-path }}" || status=$?
           if [ "$status" -eq 3 ]; then
-            echo "::notice::${{ steps.gate.outputs.tag }} was published from another commit first; this commit ships with the next Engine release."
+            echo "::notice::${{ steps.gate.outputs.tag }} was published from another commit first; the next run on the default branch evaluates this commit again."
+            gh workflow run ci.yml --ref '${{ github.event.repository.default_branch }}'
             exit 0
           fi
-          exit "$status"
+          [ "$status" -eq 0 ] || exit "$status"
+          if [ '${{ steps.gate.outputs.followup }}' = 'true' ]; then
+            # This run completed an older tag's missing release; the default-branch tip is evaluated afresh.
+            gh workflow run ci.yml --ref '${{ github.event.repository.default_branch }}'
+            echo "::notice::Started a follow-up run on ${{ github.event.repository.default_branch }} to evaluate its tip now that ${{ steps.gate.outputs.tag }} is published."
+          fi
