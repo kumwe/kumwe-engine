@@ -4,7 +4,7 @@ declare(strict_types=1);
 /** Render the GitHub release notes for an assembled binding source bundle (see release-source.php) to stdout. */
 $bundle = $argv[1] ?? throw new InvalidArgumentException('Usage: php tools/release-notes.php BUNDLE_DIRECTORY');
 $record = json_decode(file_get_contents($bundle . '/source.json') ?: throw new RuntimeException('Missing source.json'), true, 512, JSON_THROW_ON_ERROR);
-$root = dirname(__DIR__);
+$root = getenv('KUMWE_ROOT') ?: dirname(__DIR__);
 $commit = $record['source']['commit'];
 $version = $record['version'];
 $engine = $record['engine'];

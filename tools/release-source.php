@@ -518,7 +518,9 @@ function arguments(array $argv): array
 function main(array $argv): void
 {
     $arguments = arguments($argv);
-    $root = realpath(dirname(__DIR__)) ?: throw new ReleaseError('Cannot resolve source root.');
+    // KUMWE_ROOT points the tooling at another checkout of this repository (the workflow completes a
+    // release for an older tagged commit with the current scripts by checking that commit out separately).
+    $root = realpath(getenv('KUMWE_ROOT') ?: dirname(__DIR__)) ?: throw new ReleaseError('Cannot resolve source root.');
     if (is_link($arguments['directory'])) { throw new ReleaseError('Evidence directory may not be a symbolic link.'); }
     $destination = outside_source($root, $arguments['directory']);
     $commit = clean_source($root);

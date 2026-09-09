@@ -101,8 +101,9 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Pushed $(git rev-parse HEAD) to $RELEASE_BRANCH"
           fi
-          # An embedded but still unpublished version (a failed or cancelled quality run) is retried.
-          if git ls-remote --tags --exit-code origin "refs/tags/v$version" > /dev/null; then
+          # An embedded version whose GitHub release is not published (a failed, cancelled or interrupted
+          # quality run) is retried; the quality workflow completes a tag whose release is missing.
+          if [ "$(gh release view "v$version" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2> /dev/null)" = "false" ]; then
             echo "published=true" >> "$GITHUB_OUTPUT"
           else
             echo "published=false" >> "$GITHUB_OUTPUT"

@@ -6,7 +6,9 @@
 # checkout; it never infers the repository from the working directory, so bundle paths are passed in full.
 # Exit status 3 means the tag was published from another commit while this run was in flight.
 set -euo pipefail
-root="$(cd "$(dirname "$0")/.." && pwd)"
+# KUMWE_ROOT points the tooling at another checkout of this repository: the workflow completes a release
+# for an older tagged commit with the current scripts by checking that commit out separately.
+root="${KUMWE_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 bundle="${1:?usage: release-publish.sh BUNDLE_DIRECTORY [PROVENANCE_BUNDLE]}"
 provenance="${2:-}"
 fail() { printf '%s\n' "$*" >&2; exit 1; }
@@ -71,5 +73,10 @@ else
     fi
   done
   rm -rf "$scratch"
+fi
+# A publish that stopped between the draft and its promotion leaves a draft; promote it, never recreate it.
+if [ "$(gh release view "$tag" --repo "$repository" --json isDraft --jq .isDraft)" = "true" ]; then
+  gh release edit "$tag" --repo "$repository" --draft=false
+  printf 'Published the draft release %s\n' "$tag"
 fi
 gh release view "$tag" --repo "$repository" --json tagName,isDraft,url --jq '"Release " + .tagName + " published=" + (.isDraft | not | tostring) + " " + .url'
