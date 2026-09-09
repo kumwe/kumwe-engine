@@ -25,8 +25,10 @@ that picks up any release the dispatch missed. It:
    `resources/compatibility/v1.json`;
 4. commits `Embed Engine vX.Y.Z` to the default branch as `Lemuel <lemuel@vdm.to>`
    (override with repository variables `KUMWE_RELEASE_AUTHOR_NAME` and
-   `KUMWE_RELEASE_AUTHOR_EMAIL`) and starts the `Native binding candidate` workflow on
-   that commit. If the release is already embedded nothing is committed.
+   `KUMWE_RELEASE_AUTHOR_EMAIL`), refreshes the handoff digests, and starts the `Native
+   binding candidate` workflow on that commit. If the release is already embedded nothing
+   is committed, but the quality workflow is still started when `vX.Y.Z` has not been
+   tagged yet, so a failed or cancelled run is retried on the next sync.
 
 `php tools/verify-engine.php` (also run by `configure`) checks the embedded tree against
 the lock, the compiled handshake header against the lock, and the hard link between the
@@ -50,10 +52,11 @@ On the default branch, when every lane passed, the `release` job runs
 
 - the embedded Engine is a published release (`release` in the lock is not null);
 - the extension version equals that Engine version (enforced by `verify-engine.php`);
-- tag `vX.Y.Z` does not exist yet. If it already identifies this commit there is nothing
-  to do; if it identifies another commit the change is binding-only and ships with the
-  next Engine release (cut one by running the Engine's `Native quality` workflow on
-  `main`, which bumps the patch and dispatches the sync).
+- tag `vX.Y.Z` does not exist yet, or identifies this commit without its GitHub release
+  (a rerun then completes the publication). If it identifies another commit the change is
+  binding-only and ships with the next Engine release: start the Engine's `Native quality`
+  workflow on its `main` with the `bump` input enabled, which declares the next patch,
+  publishes it and dispatches the sync back here.
 
 It then assembles the bundle with `php tools/release-source.php prepare`, attests GitHub
 OIDC build provenance, creates the annotated tag on the tested commit, and publishes the

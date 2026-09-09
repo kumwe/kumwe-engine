@@ -13,10 +13,10 @@ source:
     capability_index_sha256: null
   semantic_inputs:
   - owner: kumwe/engine
-    version_or_commit: 1.0.0 at 73d11f2f71a6bd2bb903c7caafd94e0f9950ec0c
-    manifest_or_corpus: resources/engine-lock.json; exact unprefixed git archive tar, embedded manifests and complete
-      per-file closure
-    sha256: c350db3ce8fed53b28ccaf835dc2474050a919e582765871f70a0caf45b12001
+    version_or_commit: 1.0.0 at 980205c47e416c877c86881f039c44925ec215ab
+    manifest_or_corpus: resources/engine-lock.json; exact published release archive (kumwe-engine-source.tar.gz) and
+      complete per-file closure
+    sha256: 3db81ff88465b147c96bbdd53092b1132984e93e08e74a8261ee9360963b4c1a
   examined_dependencies:
   - Engine C ABI, complete locked source, all semantic corpora and capability manifests; no semantic implementation
     is owned by this binding.
@@ -44,11 +44,11 @@ ownership:
   next_consumer: kumwe/computation
   public_manifests:
   - path: resources/api/v1.json
-    sha256: 9b81eac7ec67e1bd084538d142d1b85f85c299e23597dccb7de538ee1d660d18
+    sha256: 48c01fcc0344565375ab3ee227594a870a65e404352787688d12337e84cb5a93
   - path: resources/compatibility/v1.json
-    sha256: 6155c84fcf0b760e16b0b166c3d4ef1bafc7e05da18a9aefd48bed6b39c67371
+    sha256: 8f4f6c133e76699183d280aea63834b142f8e36b434893248eebafc069a509ea
   - path: resources/engine-lock.json
-    sha256: c5faaabbeff7cb42e5682ce6bb3989d8fcf8c33d12fbaa77b31f1ef4118299af
+    sha256: 5a7641f2e40fb6f9c66d78a74276967705c5479cf8577b4264b562ddd7e0c997
   - path: stubs/kumwe_engine.stub.php
     sha256: 60759986320f6b6aa393452c9d41bb55c013c52d633124d14f9c260e07b8d976
   - path: src/kumwe_engine_arginfo.h
@@ -80,8 +80,8 @@ php_extension:
   - tools/generate-arginfo.php --check; stubs are never autoloaded.
   embedded_engine:
     version: 1.0.0
-    source_commit: 73d11f2f71a6bd2bb903c7caafd94e0f9950ec0c
-    source_archive_sha256: c350db3ce8fed53b28ccaf835dc2474050a919e582765871f70a0caf45b12001
+    source_commit: 980205c47e416c877c86881f039c44925ec215ab
+    source_archive_sha256: 3db81ff88465b147c96bbdd53092b1132984e93e08e74a8261ee9360963b4c1a
     abi_major: 1
     capabilities:
     - decimal-batch-draft/1
@@ -169,8 +169,8 @@ release_expectations:
   - SPDX source inventory
   - GitHub OIDC source provenance
   required_checks:
-  - Exact source-head source preparation, NTS and ZTS PHP binding/PHPT/Valgrind, ASan/UBSan, offline PIE and full
-    whole-boundary benchmark jobs.
+  - Exact source-head source preparation, the NTS PHP binding/PHPT/Valgrind lane, the ZTS binding/PHPT/lifecycle
+    lane, ASan/UBSan, offline PIE and full whole-boundary benchmark jobs.
   - Complete Engine lock, verified Engine release checksum and build provenance, and frozen ABI/capability/corpus identity.
   - The release job refuses unreleased embedded source, version drift, tag moves and asset replacement.
   required_registry_or_installer: PIE 1.4.10; source builds without network after explicit toolchain provisioning.
@@ -179,9 +179,9 @@ next_task:
   phase_name: Finish exact candidate qualification, then re-embed independently verified immutable Engine and qualify
     stable binding.
   permitted_only_when:
-  - All exact-source native and binding gates pass and the external Engine candidate attestation is independently
-    reviewed.
-  - Stable embedding uses an actual published Engine archive and successful independent release verification.
+  - The Engine sync has embedded a published Engine release whose archive checksum and GitHub OIDC build provenance
+    verified.
+  - Every binding quality lane passes on that default-branch commit; the workflow then tags and publishes it.
   consumer_repository: https://github.com/kumwe/computation
   dependency_or_native_change: Publish the verified binding source and exact module identity; native Computation
     and SDK consumption follow. App provisioning/cutover is separately authorized later.
@@ -203,7 +203,8 @@ next_task:
   capability_index_changes: []
   changelog_and_evidence_changes:
   - Retain NRM-2026-043/044 enabling evidence; completion_claim false is not an App roadmap completion claim.
-  - External candidate/release records bind the exact final source/head/tree, handoff and archive digests.
+  - Each release's source.json and GitHub OIDC provenance bind the exact source/head/tree, embedded Engine and
+    archive digests.
   verification_commands:
   - php tools/generate-arginfo.php --check
   - php tools/verify-binding.php
@@ -234,7 +235,7 @@ governance:
   completion_claim: false
 decisions:
 - Keep semantic algorithms exclusively in Engine and adapters exclusively in their Composer owners.
-- Qualify only PHP 8.5 NTS Linux x86_64; other tuples require new passing evidence.
+- Qualify PHP 8.5 NTS and ZTS on Linux x86_64; other tuples require new passing evidence.
 - Publish honest measured whole-boundary results, including slower workloads; App workload acceptance is later.
 blockers:
 - The embedded Engine records Reporting 0.1.3 as unverified metadata because its clean consumer cannot resolve the
@@ -255,7 +256,7 @@ The binding implements the complete native PHP transport and ownership surface f
 
 ## Capability reuse/semantic input review
 
-[Engine lock](resources/engine-lock.json) binds the exact upstream git archive, its original file inventory, the reviewed tooling profile and every actual embedded source file. The embedded contracts matrix identifies semantic owner sources/corpora. The binding adds transport features only, never semantic substitutes. The final stable step replaces the entire verified Engine closure and repeats all gates.
+[Engine lock](resources/engine-lock.json) binds the exact published Engine release archive (tag, version, commit, archive digest) and every embedded source file, installed unchanged under `vendor/engine`. The embedded contracts matrix identifies semantic owner sources/corpora. The binding adds transport features only, never semantic substitutes. Every Engine release replaces the entire embedded closure through the Engine sync workflow and repeats all gates.
 
 ## Consumer inventory
 
@@ -267,11 +268,11 @@ Engine retains C/C++ semantics, ABI and native threading tests. This repository 
 
 ## Next-task execution notes
 
-Follow [release instructions](docs/releasing.md): verify the immutable Engine release independently, replace its complete source through the guarded embed helper, update the lock/API/compatibility identities and this handoff, then repeat every exact-head quality lane. The release publisher requires stable source metadata and signed provenance before it may create immutable assets. Publish and independently verify both native releases before downstream stable native consumers; perform App provisioning only in a later task.
+Follow [versioning, Engine synchronisation and releases](docs/releasing.md). The `Engine sync` workflow embeds each published Engine release through `tools/sync-engine.php` after verifying its checksum and GitHub OIDC build provenance, updates the lock, handshake header, declared versions and this handoff's digests, commits to the default branch and starts the quality workflow; a green run publishes the extension under the same version with signed provenance. Downstream native consumers pin those published tags; App provisioning is a later task.
 
 ## Drift check
 
-Engine replacement refuses dirty, unrecorded or symlinked old source and verifies complete incoming archive/file identities. Generated arginfo and configured build identity must match committed manifests and the loaded native tuple. Exact-head CI prevents synthetic PR merge archives from being reported as candidate heads. Any source change requires new source/handshake evidence and external attestation; released artifacts are never overwritten.
+Engine replacement refuses dirty, unrecorded or symlinked old source and verifies complete incoming archive/file identities. Generated arginfo and configured build identity must match committed manifests and the loaded native tuple. Exact-head CI prevents synthetic PR merge archives from being reported as tested heads. `tools/verify-engine.php` (also run by configure) enforces the hard version link on every build; released artifacts are never overwritten.
 
 ## Validation recipe and observed local results
 

@@ -6,8 +6,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+# Pull requests replace their in-flight run; default-branch runs are keyed by commit so none is dropped.
 concurrency:
-  group: binding-${{ github.workflow }}-${{ github.ref }}
+  group: binding-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   source-release-preparation:
@@ -413,4 +414,11 @@ jobs:
             ${{ runner.temp }}/release/source.spdx.json
       - name: Tag the tested commit and publish the immutable release
         if: steps.gate.outputs.release == 'true'
-        run: bash tools/release-publish.sh "$RUNNER_TEMP/release" "${{ steps.provenance.outputs.bundle-path }}"
+        run: |
+          status=0
+          bash tools/release-publish.sh "$RUNNER_TEMP/release" "${{ steps.provenance.outputs.bundle-path }}" || status=$?
+          if [ "$status" -eq 3 ]; then
+            echo "::notice::${{ steps.gate.outputs.tag }} was published from another commit first; this commit ships with the next Engine release."
+            exit 0
+          fi
+          exit "$status"

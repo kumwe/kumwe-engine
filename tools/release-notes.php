@@ -16,8 +16,9 @@ $previous = trim((string) shell_exec('git -C ' . escapeshellarg($root) . ' descr
 $lines = [];
 $lines[] = 'Kumwe Engine PHP binding ' . $version . ': immutable source release from `' . $commit . '`.';
 $lines[] = '';
-$lines[] = 'Every lane of the `Native binding candidate` workflow (source packaging, NTS and ZTS builds with PHPT and Valgrind, '
-    . 'ASan/UBSan, network-isolated PIE install and the whole-boundary benchmark) passed on this exact commit before the tag was created. '
+$lines[] = 'Every lane of the `Native binding candidate` workflow (source packaging, the NTS build with PHPT and Valgrind, '
+    . 'the ZTS build with PHPT and the allocation lifecycle, ASan/UBSan, network-isolated PIE install and the whole-boundary '
+    . 'benchmark) passed on this exact commit before the tag was created. '
     . 'The attached archive, SPDX inventory and checksums carry GitHub OIDC build provenance; verify a download with '
     . '`sha256sum --check SHA256SUMS` and `gh attestation verify kumwe-engine-php-source.tar.gz --repo kumwe/kumwe-engine`.';
 $lines[] = '';
