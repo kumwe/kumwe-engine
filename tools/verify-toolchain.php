@@ -21,6 +21,13 @@ foreach ($paths as $path) {
         && preg_match('/\b(?:python[0-9.]*|pip[0-9.]*|node|npm|npx)\b/i', file_get_contents($root . '/' . $path))) {
         throw new RuntimeException('Unsupported interpreter invocation: ' . $path);
     }
+    if (str_ends_with($path, '.sh')) {
+        $syntax = proc_open(['bash', '-n', $root . '/' . $path],
+            [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => STDERR], $unused);
+        if (!is_resource($syntax) || proc_close($syntax) !== 0) {
+            throw new RuntimeException('Shell syntax check failed: ' . $path);
+        }
+    }
     if (str_ends_with($path, '.php')) {
         $lint = proc_open([PHP_BINARY, '-l', $root . '/' . $path],
             [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => STDERR], $unused);

@@ -6,11 +6,21 @@ require __DIR__ . '/benchmark-runtime.php';
 
 use Kumwe\Engine\Benchmark\Worker;
 use function Kumwe\Engine\Benchmark\{close_workers, concurrent, distribution, job, matrix_jobs,
-    parse_arguments, regression, require_comparable_metadata, require_parity};
+    parse_arguments, regression, require_comparable_metadata, require_parity, worker_process, command, sha};
 
 function check(bool $condition, string $message): void
 {
     if (!$condition) { throw new RuntimeException($message); }
+}
+
+function remove_test_tree(string $path): void
+{
+    if (is_dir($path) && !is_link($path)) {
+        foreach (scandir($path) as $name) {
+            if ($name !== '.' && $name !== '..') { remove_test_tree($path . '/' . $name); }
+        }
+        rmdir($path);
+    } else { unlink($path); }
 }
 
 function refused(callable $action, string $label): void
@@ -121,9 +131,72 @@ try {
     $workers[] = $worker;
     refused(static fn () => $worker->request(job('decimal', 1)), 'worker EOF');
     close_workers($workers); $workers = [];
-    echo "Benchmark admission, coverage and concurrent PHP worker tests passed.\n";
+    // Exercise the actual captured-loader route: ordinary wrappers remove LD_PRELOAD,
+    // so probes must be explicit loader arguments and must not contaminate child environments.
+    $fixtureRoot = $temp . '/diagnostic';
+    foreach (['lib', 'runtime', 'empty-ini'] as $directory) { mkdir($fixtureRoot . '/' . $directory, 0700, true); }
+    $elf = command(['readelf', '-l', PHP_BINARY]);
+    check($elf['exit_code'] === 0
+        && preg_match('/\[Requesting program interpreter: ([^\]]+)\]/', $elf['stdout'], $interpreter) === 1,
+        'test PHP identifies a dynamic loader');
+    symlink($interpreter[1], $fixtureRoot . '/lib/loader');
+    symlink(PHP_BINARY, $fixtureRoot . '/runtime/php');
+    file_put_contents($fixtureRoot . '/php.ini', "date.timezone=UTC\n");
+    $probeSource = $temp . '/preload.c';
+    file_put_contents($probeSource, <<<'C'
+#include <stdio.h>
+#include <stdlib.h>
+__attribute__((constructor)) static void loaded(void) {
+    const char *path = getenv("KUMWE_BENCH_ALLOCATION_FILE");
+    if (path == NULL) return;
+    FILE *output = fopen(path, "a");
+    if (output != NULL) { fputs("loaded\n", output); fclose(output); }
+}
+C
+    );
+    $preloads = [];
+    foreach (['deepbind_probe.so', 'allocation_probe.so'] as $name) {
+        $path = $temp . '/' . $name;
+        $compiled = command(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-shared', '-fPIC', $probeSource, '-o', $path]);
+        check($compiled['exit_code'] === 0, 'test preload compiled: ' . $compiled['stderr']);
+        $preloads[$path] = sha($path);
+    }
+    $probeArgs = $args + ['diagnostic_runtime' => $fixtureRoot,
+        '_diagnostic_loader' => 'lib/loader', '_allocation_preloads' => $preloads];
+    $probeEnv = ['LD_PRELOAD' => implode(':', array_keys($preloads)), 'LD_AUDIT' => 'must-not-load',
+        'LD_LIBRARY_PATH' => '/must-not-use', 'USE_ZEND_ALLOC' => '0',
+        'KUMWE_BENCH_ALLOCATION_FILE' => $temp . '/preload-observed',
+        'KUMWE_BENCH_DISABLE_DEEPBIND' => '1'];
+    [$instrumented, $environment] = worker_process($probeArgs, 'php', $temp . '/unused.json', $probeEnv);
+    check(array_slice($instrumented, 0, 7) === [$fixtureRoot . '/lib/loader', '--inhibit-cache',
+        '--library-path', $fixtureRoot . '/lib', '--preload', $probeEnv['LD_PRELOAD'], $fixtureRoot . '/runtime/php'],
+        'diagnostic probe uses explicit captured loader preload');
+    check(!isset($environment['LD_PRELOAD'], $environment['LD_AUDIT'], $environment['LD_LIBRARY_PATH'])
+        && $environment['PHPRC'] === $fixtureRoot . '/php.ini'
+        && $environment['PHP_INI_SCAN_DIR'] === $fixtureRoot . '/empty-ini'
+        && $environment['USE_ZEND_ALLOC'] === '0', 'diagnostic process environment is isolated');
+    $instrumented = array_slice($instrumented, 0, -2);
+    array_push($instrumented, '-r',
+        'echo json_encode(["preload" => getenv("LD_PRELOAD"), "memory" => ini_get("memory_limit"), "allocator" => getenv("USE_ZEND_ALLOC")]);');
+    $probeOut = tmpfile(); $probeErr = tmpfile();
+    $process = proc_open($instrumented, [0 => ['file', '/dev/null', 'r'], 1 => $probeOut, 2 => $probeErr],
+        $pipes, null, $environment);
+    check(is_resource($process), 'instrumented PHP process starts');
+    $status = proc_close($process);
+    rewind($probeOut); rewind($probeErr);
+    $observed = stream_get_contents($probeOut); $errors = stream_get_contents($probeErr);
+    fclose($probeOut); fclose($probeErr);
+    check($status === 0, 'instrumented PHP process succeeds: ' . $errors);
+    check(json_decode($observed, true, 512, JSON_THROW_ON_ERROR) === ['preload' => false, 'memory' => '1G', 'allocator' => '0'],
+        'instrumented PHP preserves worker budget and allocator configuration');
+    check(file_get_contents($temp . '/preload-observed') === "loaded\nloaded\n",
+        'both probes actually load despite cleared LD_PRELOAD');
+    $changed = $probeArgs; $changed['_allocation_preloads'][$temp . '/allocation_probe.so'] = str_repeat('0', 64);
+    refused(static fn () => worker_process($changed, 'php', $temp . '/unused.json', $probeEnv), 'changed probe digest');
+    $changed = $probeArgs; unset($changed['_diagnostic_loader']);
+    refused(static fn () => worker_process($changed, 'php', $temp . '/unused.json', $probeEnv), 'unverified diagnostic loader');
+    echo "Benchmark admission, coverage, concurrent workers and explicit diagnostic preload tests passed.\n";
 } finally {
     close_workers($workers);
-    foreach (glob($temp . '/*') as $path) { unlink($path); }
-    rmdir($temp);
+    remove_test_tree($temp);
 }

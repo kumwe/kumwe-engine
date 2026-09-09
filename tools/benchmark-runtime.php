@@ -157,6 +157,53 @@ function regression(array $previous, array $current, float $threshold): array
         'bootstrap_95_interval' => [$ratios[49], $ratios[1949]], 'regression' => $ratios[49] > 1 + $threshold];
 }
 
+/**
+ * Invoke a verified diagnostic loader explicitly for allocation instrumentation.
+ * Its ordinary wrapper continues clearing all dynamic-loader environment variables.
+ */
+function worker_process(array $args, string $backend, string $configPath, array $extraEnv = [],
+    ?array $invocation = null): array
+{
+    $env = getenv(); unset($env['USE_ZEND_ALLOC']);
+    $env = array_merge($env, $extraEnv);
+    if ($invocation === null) {
+        if (($args['diagnostic_runtime'] ?? null) !== null && isset($extraEnv['LD_PRELOAD'])) {
+            $root = $args['diagnostic_runtime'];
+            $loader = $args['_diagnostic_loader'] ?? null;
+            if (!is_string($loader) || !str_starts_with($loader, 'lib/')
+                || in_array('..', explode('/', $loader), true)) {
+                throw new \RuntimeException('Allocation workers require an independently verified diagnostic loader');
+            }
+            $expected = $args['_allocation_preloads'] ?? [];
+            $paths = [$args['output'] . '/deepbind_probe.so', $args['output'] . '/allocation_probe.so'];
+            if ($extraEnv['LD_PRELOAD'] !== implode(':', $paths) || count($expected) !== count($paths)) {
+                throw new \RuntimeException('Allocation preload list differs from the compiled probes');
+            }
+            foreach ($paths as $path) {
+                if (preg_match('/[:\s]/', $path) || !isset($expected[$path])
+                    || !is_file($path) || is_link($path) || sha($path) !== $expected[$path]) {
+                    throw new \RuntimeException('Allocation preload path or digest differs from the compiled probe: ' . $path);
+                }
+            }
+            if (!is_executable($root . '/' . $loader) || !is_executable($root . '/runtime/php')) {
+                throw new \RuntimeException('Diagnostic runtime must be verified and activated before benchmarking');
+            }
+            unset($env['LD_PRELOAD'], $env['LD_AUDIT'], $env['LD_LIBRARY_PATH']);
+            $env['KUMWE_DIAGNOSTIC_ROOT'] = $root;
+            $env['PHPRC'] = $root . '/php.ini';
+            $env['PHP_INI_SCAN_DIR'] = $root . '/empty-ini';
+            $invocation = [$root . '/' . $loader, '--inhibit-cache', '--library-path', $root . '/lib',
+                '--preload', implode(':', $paths), $root . '/runtime/php'];
+        } else {
+            $invocation = [$args['php']];
+        }
+        array_push($invocation, '-d', 'memory_limit=1G', '-d', 'display_errors=stderr');
+        if ($backend === 'native') { array_push($invocation, '-d', 'extension=' . $args['extension']); }
+        array_push($invocation, $args['engine'] . '/benchmarks/e2e/worker.php', $configPath);
+    }
+    return [$invocation, $env];
+}
+
 final class Worker
 {
     public array $ready;
@@ -174,13 +221,7 @@ final class Worker
         foreach (['app', 'sdk', 'autoload', 'engine'] as $key) { $config[$key] = $args[$key]; }
         $config['backend'] = $backend;
         $configPath = $args['output'] . '/' . $label . '.config.json'; write($configPath, $config);
-        if ($invocation === null) {
-            $invocation = [$args['php'], '-d', 'memory_limit=1G', '-d', 'display_errors=stderr'];
-            if ($backend === 'native') { array_push($invocation, '-d', 'extension=' . $args['extension']); }
-            array_push($invocation, $args['engine'] . '/benchmarks/e2e/worker.php', $configPath);
-        }
-        $env = getenv(); unset($env['USE_ZEND_ALLOC']);
-        $env = array_merge($env, $extraEnv);
+        [$invocation, $env] = worker_process($args, $backend, $configPath, $extraEnv, $invocation);
         $this->process = proc_open($invocation, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'],
             2 => ['file', $args['output'] . '/' . $label . '.stderr.log', 'w']], $this->pipes, null, $env);
         if (!is_resource($this->process)) { throw new \RuntimeException("{$label}: cannot start worker"); }
@@ -430,6 +471,8 @@ function allocations(array $args, array &$results): void
     $results['allocation_probe'] = ['build' => $compiled, 'sha256' => sha($probe),
         'deepbind_build' => $deepbindBuild, 'deepbind_sha256' => sha($deepbind),
         'scope' => 'Fresh whole process, successful glibc-interposed requested bytes/calls, USE_ZEND_ALLOC=0 and diagnostic RTLD_DEEPBIND removal; includes startup, compilation, warmup and measured jobs. Not live heap and not primary timing.'];
+    $args['_allocation_preloads'] = [$deepbind => $results['allocation_probe']['deepbind_sha256'],
+        $probe => $results['allocation_probe']['sha256']];
     foreach ($args['profiles'] as $profile) {
         $expected = null;
         foreach (['php', 'native'] as $backend) {
@@ -529,13 +572,13 @@ function parse_arguments(array $argv): array
         'engine' => dirname(__DIR__) . '/benchmark-sources/engine', 'output' => null, 'build_dir' => null,
         'profiles' => PROFILES, 'sizes' => [1, 32, 256, 4096], 'samples' => 30, 'warmup' => 10,
         'workers' => [1, 2, 4, 8], 'capacity_seconds' => 3.0, 'capacity_size' => 32, 'burst_jobs' => 64,
-        'cc' => 'cc', 'baseline' => null, 'demand' => [], 'regression_threshold' => 0.10, 'smoke' => false];
+        'cc' => 'cc', 'baseline' => null, 'diagnostic_runtime' => null, 'demand' => [], 'regression_threshold' => 0.10, 'smoke' => false];
     for ($i = 1; $i < count($argv); ++$i) {
         if ($argv[$i] === '--help' || $argv[$i] === '-h') {
             echo "Usage: php tools/benchmark-runtime.php --php PATH --extension PATH --app PATH --sdk PATH --autoload PATH --output NEW_DIRECTORY [options]\n";
             echo "Options: --engine PATH --build-dir PATH --profiles NAME... --sizes N... --workers N... --samples N --warmup N\n";
             echo "         --capacity-seconds N --capacity-size N --burst-jobs N --cc COMMAND --baseline FILE\n";
-            echo "         --demand PROFILE=UNITS_PER_SECOND --regression-threshold N --smoke\n";
+            echo "         --demand PROFILE=UNITS_PER_SECOND --regression-threshold N --diagnostic-runtime DIRECTORY --smoke\n";
             exit(0);
         }
         $parts = explode('=', $argv[$i], 2); $name = str_replace('-', '_', substr($parts[0], 2));
@@ -620,6 +663,22 @@ function file_hashes(string $root, bool $recursive): array
 function main(array $argv): int
 {
     $args = parse_arguments($argv);
+    $diagnosticLoader = null;
+    if ($args['diagnostic_runtime'] !== null) {
+        require_once __DIR__ . '/diagnostic-runtime.php';
+        $head = command(['git', '-C', dirname(__DIR__), 'rev-parse', 'HEAD']);
+        if ($head['exit_code'] !== 0 || !preg_match('/^[a-f0-9]{40}$/D', $head['stdout'])) {
+            throw new \RuntimeException('Cannot independently identify the diagnostic source commit');
+        }
+        $fixture = \Kumwe\Tools\DiagnosticRuntime\verify($args['diagnostic_runtime'], $head['stdout']);
+        $args['diagnostic_runtime'] = realpath($args['diagnostic_runtime']);
+        $diagnosticLoader = $fixture['loader'];
+        foreach ([$diagnosticLoader, 'runtime/php'] as $path) {
+            if (!is_executable($args['diagnostic_runtime'] . '/' . $path)) {
+                throw new \RuntimeException('Diagnostic runtime must be verified and activated before benchmarking');
+            }
+        }
+    }
     if (file_exists($args['output']) || is_link($args['output']) || !mkdir($args['output'], 0777, true)) {
         throw new \RuntimeException('Output directory must not already exist');
     }
@@ -652,6 +711,7 @@ function main(array $argv): int
         $cache = $args['build_dir'] . '/CMakeCache.txt';
         $metadata['cmake_cache'] = is_file($cache) ? file_get_contents($cache) : null;
     }
+    $args['_diagnostic_loader'] = $diagnosticLoader;
     $results = ['metadata' => $metadata, 'matrix' => [], 'capacity' => [], 'allocations' => [], 'complete' => false];
     $workers = [];
     try {
