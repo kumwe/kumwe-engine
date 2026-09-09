@@ -13,10 +13,10 @@ source:
     capability_index_sha256: null
   semantic_inputs:
   - owner: kumwe/engine
-    version_or_commit: 1.0.0 at 980205c47e416c877c86881f039c44925ec215ab
+    version_or_commit: 1.0.0 at 43b208fc27446629738eb3c761bfe712cabf1f90
     manifest_or_corpus: resources/engine-lock.json; exact published release archive (kumwe-engine-source.tar.gz) and
       complete per-file closure
-    sha256: 3db81ff88465b147c96bbdd53092b1132984e93e08e74a8261ee9360963b4c1a
+    sha256: b910f6ee11f6c4ee56fa9d2673b0fa37a2bc385713503d0ddb7f04da67550fc0
   examined_dependencies:
   - Engine C ABI, complete locked source, all semantic corpora and capability manifests; no semantic implementation
     is owned by this binding.
@@ -48,7 +48,7 @@ ownership:
   - path: resources/compatibility/v1.json
     sha256: 8f4f6c133e76699183d280aea63834b142f8e36b434893248eebafc069a509ea
   - path: resources/engine-lock.json
-    sha256: 5a7641f2e40fb6f9c66d78a74276967705c5479cf8577b4264b562ddd7e0c997
+    sha256: 3de49a93f67d51761a3287b637152ba4bc095bc0d4ddaf3531d83aeb375767d4
   - path: stubs/kumwe_engine.stub.php
     sha256: 60759986320f6b6aa393452c9d41bb55c013c52d633124d14f9c260e07b8d976
   - path: src/kumwe_engine_arginfo.h
@@ -80,8 +80,8 @@ php_extension:
   - tools/generate-arginfo.php --check; stubs are never autoloaded.
   embedded_engine:
     version: 1.0.0
-    source_commit: 980205c47e416c877c86881f039c44925ec215ab
-    source_archive_sha256: 3db81ff88465b147c96bbdd53092b1132984e93e08e74a8261ee9360963b4c1a
+    source_commit: 43b208fc27446629738eb3c761bfe712cabf1f90
+    source_archive_sha256: b910f6ee11f6c4ee56fa9d2673b0fa37a2bc385713503d0ddb7f04da67550fc0
     abi_major: 1
     capabilities:
     - decimal-batch-draft/1
