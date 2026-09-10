@@ -240,7 +240,8 @@ decisions:
 blockers:
 - The embedded Engine records Reporting 0.1.3 as unverified metadata because its clean consumer cannot resolve the
   missing Access Control package registration; this no longer blocks publication.
-- The first binding release follows the first published Engine release: the Engine sync workflow embeds it and the
+- >-
+  The first binding release follows the first published Engine release: the Engine sync workflow embeds it and the
   quality workflow publishes the binding under the same version.
 ---
 
