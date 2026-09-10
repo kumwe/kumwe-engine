@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Encode the migration handoff's release explanation as a YAML scalar so its colon and
+  continuation remain one string and independent release verification can parse the full
+  handoff. The released 1.0.1 source and embedded Engine identity are unchanged.
+
 - Make the release pipeline complete without people. The release gate
   (`tools/release-gate.php`) completes any tag whose GitHub release is missing from the
   commit the tag identifies (with the current tooling, then re-evaluates the tip in a
