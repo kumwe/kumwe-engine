@@ -69,10 +69,10 @@ function replaceOnce(string $content, string $pattern, string $replacement, stri
 }
 
 /**
- * The migration handoff records the embedded Engine coordinates and the lock digest; keep those
+ * The migration handoff records the embedded Engine coordinates and generated manifest digests; keep those
  * lines truthful on every sync. Every pattern is anchored so a changed handoff shape fails loudly.
  */
-function updateHandoff(string $content, array $lock, string $lockDigest): string
+function updateHandoff(string $content, array $lock, string $lockDigest, string $compatibilityDigest): string
 {
     $coordinate = $lock['version'] . ($lock['release'] === null ? '' : ' (' . $lock['release'] . ')') . ' at ' . $lock['commit'];
     $edits = [
@@ -80,6 +80,7 @@ function updateHandoff(string $content, array $lock, string $lockDigest): string
         ['/^(    manifest_or_corpus: resources\/engine-lock\.json[^\n]*\n(?:      [^\n]*\n)*    sha256: )[a-f0-9]{64}$/m',
             '${1}' . $lock['archive_sha256'], 'semantic input archive digest'],
         ['/^(  - path: resources\/engine-lock\.json\n    sha256: )[a-f0-9]{64}$/m', '${1}' . $lockDigest, 'engine-lock manifest digest'],
+        ['/^(  - path: resources\/compatibility\/v1\.json\n    sha256: )[a-f0-9]{64}$/m', '${1}' . $compatibilityDigest, 'compatibility manifest digest'],
         ['/^(  embedded_engine:\n    version: )[0-9.]+$/m', '${1}' . $lock['version'], 'embedded Engine version'],
         ['/^(    source_commit: )[a-f0-9]{40}$/m', '${1}' . $lock['commit'], 'embedded Engine commit'],
         ['/^(    source_archive_sha256: )[a-f0-9]{64}$/m', '${1}' . $lock['archive_sha256'], 'embedded Engine archive digest'],
@@ -162,7 +163,9 @@ function main(array $arguments): void
     $compatibility = replaceOnce(readFile($compatibilityPath), '/^(  "version": ")[^"]*(",?)$/m',
         '${1}' . $version . '${2}', 'resources/compatibility/v1.json');
     $lockBytes = encode($lock);
-    $handoff = is_file($handoffPath) ? updateHandoff(readFile($handoffPath), $lock, hash('sha256', $lockBytes)) : null;
+    $handoff = is_file($handoffPath)
+        ? updateHandoff(readFile($handoffPath), $lock, hash('sha256', $lockBytes), hash('sha256', $compatibility))
+        : null;
 
     makeDirectory(dirname($target));
     makeDirectory(dirname($lockPath));

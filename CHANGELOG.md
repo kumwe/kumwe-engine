@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Refresh the compatibility manifest digest when Engine sync changes its version, before
+  committing the new source tuple. Verify every handoff public manifest hash during source
+  qualification and cover digest refresh and missing-declaration refusal in the sync suite.
+
 - Encode the migration handoff's release explanation as a YAML scalar so its colon and
   continuation remain one string and independent release verification can parse the full
   handoff. The released 1.0.1 source and embedded Engine identity are unchanged.

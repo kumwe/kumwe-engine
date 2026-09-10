@@ -3,6 +3,21 @@
 declare(strict_types=1);
 
 $root = dirname(__DIR__);
+$handoff = file_get_contents($root . '/MIGRATION-HANDOFF.md');
+if (!preg_match('/^  public_manifests:\n((?:  - path: [^\n]+\n    sha256: [a-f0-9]{64}\n)+)(?=  intentionally_excluded:)/m', $handoff, $inventory)) {
+    throw new RuntimeException('The complete handoff public manifest inventory is malformed.');
+}
+preg_match_all('/^  - path: ([^\n]+)\n    sha256: ([a-f0-9]{64})$/m', $inventory[1], $manifests, PREG_SET_ORDER);
+$seen = [];
+foreach ($manifests as [, $path, $digest]) {
+    if (!preg_match('/\A[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_.-]+)+\z/D', $path)
+        || in_array('..', explode('/', $path), true) || isset($seen[$path])
+        || !is_file($root . '/' . $path) || is_link($root . '/' . $path)
+        || hash_file('sha256', $root . '/' . $path) !== $digest) {
+        throw new RuntimeException('Handoff public manifest hash or path differs: ' . $path);
+    }
+    $seen[$path] = true;
+}
 $composer = json_decode(file_get_contents($root . '/composer.json'), true, 512, JSON_THROW_ON_ERROR);
 if ($composer['name'] !== 'kumwe/kumwe-engine' || $composer['type'] !== 'php-ext'
     || $composer['php-ext']['extension-name'] !== 'kumwe_engine' || isset($composer['autoload'])) {

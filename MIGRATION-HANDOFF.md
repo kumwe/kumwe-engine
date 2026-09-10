@@ -46,7 +46,7 @@ ownership:
   - path: resources/api/v1.json
     sha256: 48c01fcc0344565375ab3ee227594a870a65e404352787688d12337e84cb5a93
   - path: resources/compatibility/v1.json
-    sha256: 8f4f6c133e76699183d280aea63834b142f8e36b434893248eebafc069a509ea
+    sha256: 72fef3127abd3ff9d0e54ad7657afeb6153ead89772d4f9f8ce0fe964bd26c2a
   - path: resources/engine-lock.json
     sha256: ec7e6d39489860495be0900000aa7dbd7844efd8d834fb9fef9a02b5edd3259e
   - path: stubs/kumwe_engine.stub.php

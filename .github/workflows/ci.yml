@@ -24,6 +24,7 @@ jobs:
       - name: Verify the toolchain policy, tooling regression suites and the reproducible source bundle
         run: |
           php tools/verify-toolchain.php
+          php tools/verify-binding.php
           php tools/verify-engine.php
           php tools/release-source-test.php
           php tools/test-sync-engine.php
