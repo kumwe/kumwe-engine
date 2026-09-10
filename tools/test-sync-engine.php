@@ -47,6 +47,7 @@ try {
         . "    manifest_or_corpus: resources/engine-lock.json; exact published release archive and complete\n"
         . "      per-file closure\n    sha256: $zeroDigest\nownership:\n  public_manifests:\n"
         . "  - path: resources/api/v1.json\n    sha256: $apiDigest\n  - path: resources/engine-lock.json\n    sha256: $zeroDigest\n"
+        . "  - path: resources/compatibility/v1.json\n    sha256: $zeroDigest\n"
         . "php_extension:\n  embedded_engine:\n    version: 0.0.0\n    source_commit: " . str_repeat('0', 40) . "\n"
         . "    source_archive_sha256: $zeroDigest\n    abi_major: 1\n---\n");
     $handoffPath = $binding . '/MIGRATION-HANDOFF.md';
@@ -57,6 +58,8 @@ try {
         check(str_contains($handoff, "      per-file closure\n    sha256: {$lock['archive_sha256']}\n"), 'Handoff semantic digest is stale.');
         check(str_contains($handoff, "  - path: resources/engine-lock.json\n    sha256: " . hash_file('sha256', $binding . '/resources/engine-lock.json') . "\n"),
             'Handoff lock digest is stale.');
+        check(str_contains($handoff, "  - path: resources/compatibility/v1.json\n    sha256: " . hash_file('sha256', $binding . '/resources/compatibility/v1.json') . "\n"),
+            'Handoff compatibility digest is stale.');
         check(str_contains($handoff, "  embedded_engine:\n    version: {$lock['version']}\n    source_commit: {$lock['commit']}\n"
             . "    source_archive_sha256: {$lock['archive_sha256']}\n"), 'Handoff embedded Engine block is stale.');
         check(str_contains($handoff, "  - path: resources/api/v1.json\n    sha256: " . str_repeat('1', 64) . "\n"), 'Unrelated handoff digest changed.');
@@ -201,6 +204,12 @@ try {
     writeFile($handoffPath, str_replace("  embedded_engine:\n    version: 1.3.0\n", "  embedded_engine:\n    edition: 1.3.0\n", $handoffBytes));
     $sync([$nextArchive, '--commit', $next, '--release', 'v1.3.0'], false, 'MIGRATION-HANDOFF.md embedded Engine version');
     check(readLock($binding)['version'] === '1.3.0' && verifyBundle($binding, readLock($binding)) === null, 'A refused handoff update changed the embedding.');
+    writeFile($handoffPath, $handoffBytes);
+
+    // A missing generated manifest declaration refuses the sync before any identity is changed.
+    writeFile($handoffPath, str_replace('  - path: resources/compatibility/v1.json', '  - path: resources/compatibility/missing.json', $handoffBytes));
+    $sync([$nextArchive, '--commit', $next, '--release', 'v1.3.0'], false, 'MIGRATION-HANDOFF.md compatibility manifest digest');
+    check(readLock($binding)['version'] === '1.3.0' && verifyBundle($binding, readLock($binding)) === null, 'A refused compatibility handoff update changed the embedding.');
     writeFile($handoffPath, $handoffBytes);
 
     // The hard link is enforced: a drifted extension version fails verification.
