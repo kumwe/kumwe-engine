@@ -1,6 +1,6 @@
 {
   "schema": "kumwe-zend-compatibility/v1",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "version_policy": "The extension version always equals the embedded Engine version recorded in resources/engine-lock.json; releases are published under that shared version.",
   "engine_lock": "resources/engine-lock.json",
   "php": "8.5",
