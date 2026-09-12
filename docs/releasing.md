@@ -27,8 +27,8 @@ that picks up any release the dispatch missed. It:
    `resources/compatibility/v1.json`;
 4. commits `Embed Engine vX.Y.Z` to the default branch as `Lemuel <lemuel@vdm.to>`
    (override with repository variables `KUMWE_RELEASE_AUTHOR_NAME` and
-   `KUMWE_RELEASE_AUTHOR_EMAIL`), refreshes the handoff digests, and starts the `Native
-   binding candidate` workflow on that commit. If the release is already embedded nothing
+   `KUMWE_RELEASE_AUTHOR_EMAIL`), refreshes the release-record digests, and starts the `Native
+   binding quality` workflow on that commit. If the release is already embedded nothing
    is committed, but the quality workflow is still started while `vX.Y.Z` has no published
    GitHub release, so a failed, cancelled or interrupted run is retried on the next sync.
 
@@ -36,7 +36,7 @@ that picks up any release the dispatch missed. It:
 the lock, the compiled handshake header against the lock, and the hard link between the
 extension version, the compatibility manifest and the embedded Engine's declared version.
 
-## `Native binding candidate` (`.github/workflows/ci.yml`)
+## `Native binding quality` (`.github/workflows/ci.yml`)
 
 Every push to the default branch, pull request and manual run executes all lanes:
 

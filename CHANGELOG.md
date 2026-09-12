@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Standardize linked package, quality, PHP/platform and license badges and document the current Core contract.
+- Replace the obsolete migration handoff with a release record and preserve atomic Engine sync and manifest verification against its new path.
+- Keep the published Engine tuple unchanged until the automated sync embeds the next verified release; binding and Engine versions remain linked.
+
 - Refresh the compatibility manifest digest when Engine sync changes its version, before
   committing the new source tuple. Verify every handoff public manifest hash during source
   qualification and cover digest refresh and missing-declaration refusal in the sync suite.

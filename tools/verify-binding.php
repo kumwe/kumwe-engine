@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 $root = dirname(__DIR__);
-$handoff = file_get_contents($root . '/MIGRATION-HANDOFF.md');
-if (!preg_match('/^  public_manifests:\n((?:  - path: [^\n]+\n    sha256: [a-f0-9]{64}\n)+)(?=  intentionally_excluded:)/m', $handoff, $inventory)) {
-    throw new RuntimeException('The complete handoff public manifest inventory is malformed.');
+$record = file_get_contents($root . '/docs/release-record.md');
+if (!preg_match('/^  public_manifests:\n((?:  - path: [^\n]+\n    sha256: [a-f0-9]{64}\n)+)(?=  intentionally_excluded:)/m', $record, $inventory)) {
+    throw new RuntimeException('The complete record public manifest inventory is malformed.');
 }
 preg_match_all('/^  - path: ([^\n]+)\n    sha256: ([a-f0-9]{64})$/m', $inventory[1], $manifests, PREG_SET_ORDER);
 $seen = [];
@@ -14,7 +14,7 @@ foreach ($manifests as [, $path, $digest]) {
         || in_array('..', explode('/', $path), true) || isset($seen[$path])
         || !is_file($root . '/' . $path) || is_link($root . '/' . $path)
         || hash_file('sha256', $root . '/' . $path) !== $digest) {
-        throw new RuntimeException('Handoff public manifest hash or path differs: ' . $path);
+        throw new RuntimeException('Record public manifest hash or path differs: ' . $path);
     }
     $seen[$path] = true;
 }

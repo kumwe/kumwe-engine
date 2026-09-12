@@ -1,4 +1,4 @@
-name: Native binding candidate
+name: Native binding quality
 on:
   push:
     branches: [main]

@@ -69,10 +69,10 @@ function replaceOnce(string $content, string $pattern, string $replacement, stri
 }
 
 /**
- * The migration handoff records the embedded Engine coordinates and generated manifest digests; keep those
- * lines truthful on every sync. Every pattern is anchored so a changed handoff shape fails loudly.
+ * The release record binds the embedded Engine coordinates and generated manifest digests; keep those
+ * lines truthful on every sync. Every pattern is anchored so a changed record shape fails loudly.
  */
-function updateHandoff(string $content, array $lock, string $lockDigest, string $compatibilityDigest): string
+function updateRecord(string $content, array $lock, string $lockDigest, string $compatibilityDigest): string
 {
     $coordinate = $lock['version'] . ($lock['release'] === null ? '' : ' (' . $lock['release'] . ')') . ' at ' . $lock['commit'];
     $edits = [
@@ -86,7 +86,7 @@ function updateHandoff(string $content, array $lock, string $lockDigest, string 
         ['/^(    source_archive_sha256: )[a-f0-9]{64}$/m', '${1}' . $lock['archive_sha256'], 'embedded Engine archive digest'],
     ];
     foreach ($edits as [$pattern, $replacement, $what]) {
-        $content = replaceOnce($content, $pattern, $replacement, 'MIGRATION-HANDOFF.md ' . $what);
+        $content = replaceOnce($content, $pattern, $replacement, 'docs/release-record.md ' . $what);
     }
     return $content;
 }
@@ -145,8 +145,8 @@ function main(array $arguments): void
     $headerPath = $root . '/php_kumwe_engine_build.h';
     $versionHeaderPath = $root . '/php_kumwe_engine.h';
     $compatibilityPath = $root . '/resources/compatibility/v1.json';
-    $handoffPath = $root . '/MIGRATION-HANDOFF.md';
-    foreach ([$root . '/vendor', $root . '/resources', $target, $lockPath, $headerPath, $versionHeaderPath, $compatibilityPath, $handoffPath] as $path) {
+    $recordPath = $root . '/docs/release-record.md';
+    foreach ([$root . '/vendor', $root . '/resources', $root . '/docs', $target, $lockPath, $headerPath, $versionHeaderPath, $compatibilityPath, $recordPath] as $path) {
         if (is_link($path)) {
             throw new RuntimeException('Engine bundle and identity paths must not be symbolic links.');
         }
@@ -163,8 +163,8 @@ function main(array $arguments): void
     $compatibility = replaceOnce(readFile($compatibilityPath), '/^(  "version": ")[^"]*(",?)$/m',
         '${1}' . $version . '${2}', 'resources/compatibility/v1.json');
     $lockBytes = encode($lock);
-    $handoff = is_file($handoffPath)
-        ? updateHandoff(readFile($handoffPath), $lock, hash('sha256', $lockBytes), hash('sha256', $compatibility))
+    $record = is_file($recordPath)
+        ? updateRecord(readFile($recordPath), $lock, hash('sha256', $lockBytes), hash('sha256', $compatibility))
         : null;
 
     makeDirectory(dirname($target));
@@ -182,7 +182,7 @@ function main(array $arguments): void
             }
         }
         $previousFiles = [];
-        foreach ([$lockPath, $headerPath, $versionHeaderPath, $compatibilityPath, $handoffPath] as $path) {
+        foreach ([$lockPath, $headerPath, $versionHeaderPath, $compatibilityPath, $recordPath] as $path) {
             $previousFiles[$path] = is_file($path) ? readFile($path) : null;
         }
         $backup = $staging . '/previous';
@@ -197,8 +197,8 @@ function main(array $arguments): void
             writeFile($headerPath, buildHeader($lock));
             writeFile($versionHeaderPath, $versionHeader);
             writeFile($compatibilityPath, $compatibility);
-            if ($handoff !== null) {
-                writeFile($handoffPath, $handoff);
+            if ($record !== null) {
+                writeFile($recordPath, $record);
             }
         } catch (Throwable $error) {
             try {
