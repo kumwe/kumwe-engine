@@ -1,5 +1,11 @@
 # Kumwe Engine PHP binding
 
+[![Packagist](https://img.shields.io/packagist/v/kumwe/kumwe-engine)](https://packagist.org/packages/kumwe/kumwe-engine)
+[![Native binding quality](https://github.com/kumwe/kumwe-engine/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kumwe/kumwe-engine/actions/workflows/ci.yml)
+[![PHP 8.5 NTS and ZTS](https://img.shields.io/badge/PHP-8.5%20NTS%20%7C%20ZTS-777BB4)](#build)
+[![Linux x86_64](https://img.shields.io/badge/platform-Linux%20x86__64-blue)](resources/compatibility/v1.json)
+[![License: Apache-2.0](https://img.shields.io/github/license/kumwe/kumwe-engine)](LICENSE)
+
 `kumwe/kumwe-engine` is the PIE source package for module `kumwe_engine` and Composer platform requirement `ext-kumwe_engine`. It embeds one exact, digest-locked Kumwe Engine source release under `vendor/engine`, byte for byte as published by [`kumwe/engine`](https://github.com/kumwe/engine), and is published under the same version: extension `vX.Y.Z` always contains Engine `vX.Y.Z`. See [versioning, Engine synchronisation and releases](docs/releasing.md).
 
 The actual extension registers `Kumwe\Engine\Runtime` and `Kumwe\Engine\Exception\BindingFailure`. Its methods are `capabilities(): array`, `compile(array $envelope): array`, `execute(array $envelope): array`, and `release(string $planId): void`. Stubs are documentation and are never autoloaded.
@@ -34,7 +40,7 @@ CI also installs the exact Git source archive using PIE inside a network namespa
 
 The nearest semantic Composer package owns its interface adapter. App owns database access, authorization, HTTP, reference resolution and protected execution. This repository has no algorithms, fallback, FFI, user callbacks, subprocess runtime, or Composer interfaces registered at MINIT.
 
-See [releasing](docs/releasing.md), [memory ownership](docs/memory.md), [compatibility](resources/compatibility/v1.json) and the [migration handoff](MIGRATION-HANDOFF.md).
+See [releasing](docs/releasing.md), [memory ownership](docs/memory.md), [compatibility](resources/compatibility/v1.json) and the [Core contract](docs/core-contract.md) and [release record](docs/release-record.md).
 
 ## Releases
 
@@ -70,4 +76,4 @@ system timezone/DNS/CA data; its manifest records that boundary. Pair it with th
 binding-evidence module from the same run for native diagnostics. This inventory is
 diagnostic evidence only.
 
-Repository maintenance, source packaging, release gating, Engine synchronisation, diagnostics and benchmark orchestration use PHP 8.5 CLI; the release publisher is Bash around `gh`. Native execution remains C/C++ behind the Zend extension. The whole-boundary benchmark worker and allocation probes live under `tools/benchmark/`. Run `php tools/verify-toolchain.php` to check source languages and PHP syntax; Python and Node are not used anywhere in this repository.
+Repository maintenance, source packaging, release gating, Engine synchronisation, diagnostics and benchmark orchestration use PHP 8.5 CLI; the release publisher is Bash around `gh`. Native execution remains C/C++ behind the Zend extension. The whole-boundary benchmark worker and allocation probes live under `tools/benchmark/`. Run `php tools/verify-toolchain.php` to check source languages and PHP syntax.

@@ -112,4 +112,4 @@ jobs:
         if: steps.push.outputs.changed == 'true' || steps.push.outputs.published == 'false'
         run: |
           gh workflow run ci.yml --ref "$RELEASE_BRANCH"
-          echo "::notice::Native binding candidate started on $RELEASE_BRANCH; a green run publishes v${{ steps.push.outputs.version }}."
+          echo "::notice::Native binding quality started on $RELEASE_BRANCH; a green run publishes v${{ steps.push.outputs.version }}."
